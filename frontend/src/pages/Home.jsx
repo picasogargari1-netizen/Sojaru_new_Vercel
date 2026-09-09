@@ -175,7 +175,7 @@ function CategoryRow() {
             const spanCls =
               span === 3 ? "lg:col-span-3" : span === 2 ? "lg:col-span-2" : "lg:col-span-1";
             const imgSrc = adminCatImages[c.slug]
-              ? `${process.env.REACT_APP_BACKEND_URL}${adminCatImages[c.slug]}`
+              ? mediaUrl(adminCatImages[c.slug])
               : c.image || catImage(c.slug);
 
             return (
