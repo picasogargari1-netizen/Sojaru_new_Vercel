@@ -4,16 +4,14 @@ import { ArrowRight } from "lucide-react";
 import { useStore } from "@/context/StoreContext";
 import { useProducts } from "@/hooks/useProducts";
 import { ProductRow } from "@/components/ProductRow";
-import { IMAGES, catImage } from "@/lib/assets";
+import { catImage } from "@/lib/assets";
 import { mediaUrl } from "@/lib/api";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 // ─── 1. HERO ──────────────────────────────────────────────────────────────────
 function Hero() {
   const { settings } = useStore();
-  const heroImages = settings?.hero_images?.length
-    ? settings.hero_images.map((h) => ({ src: mediaUrl(h.url), alt: h.alt }))
-    : [{ src: IMAGES.hero, alt: "Sojaru lifestyle" }];
+  const heroImages = (settings?.hero_images || []).filter((h) => h.url);
   const heroText = settings?.hero?.subtitle || "";
   const [idx, setIdx] = useState(0);
 
@@ -30,17 +28,20 @@ function Hero() {
       data-testid="hero-section"
     >
       <div className="relative h-full w-full">
-        {heroImages.map((img, i) => (
-          <img
-            key={i}
-            src={img.src}
-            alt={img.alt}
-            onError={(e) => { e.target.src = IMAGES.hero; }}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
-              i === idx ? "opacity-100" : "opacity-0"
-            }`}
-          />
-        ))}
+        {heroImages.length > 0 ? (
+          heroImages.map((img, i) => (
+            <img
+              key={i}
+              src={mediaUrl(img.url)}
+              alt={img.alt}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
+                i === idx ? "opacity-100" : "opacity-0"
+              }`}
+            />
+          ))
+        ) : (
+          <div className="absolute inset-0 bg-[#1a0f0a]" />
+        )}
         {/* Subtle overlay for text readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/30" />
       </div>
