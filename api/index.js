@@ -51,8 +51,19 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Multer — memory storage only (Vercel has no writable filesystem)
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+// Multer v2 — no storage engine; file data read from stream
+const upload = multer({ limits: { fileSize: 8 * 1024 * 1024 } });
+
+// Read file buffer from multer v2 stream (or v1 buffer fallback)
+function fileBuffer(file) {
+  if (file.buffer) return Promise.resolve(file.buffer);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    file.stream.on("data", (c) => chunks.push(c));
+    file.stream.on("end", () => resolve(Buffer.concat(chunks)));
+    file.stream.on("error", reject);
+  });
+}
 
 // ─── In-memory TTL cache ──────────────────────────────────────────────────────
 const _cache = {};
@@ -359,8 +370,9 @@ app.post("/api/admin/hero-images", upload.single("file"), wrap(async (req, res) 
   const doc = await getSettings();
   if ((doc.hero_images || []).length >= 5) { const e = new Error("Maximum 5 hero images. Delete one first."); e.status = 400; throw e; }
   if (!req.file) { const e = new Error("No file uploaded"); e.status = 400; throw e; }
+  const buffer = await fileBuffer(req.file);
   let result;
-  try { result = await cloudinaryUpload(req.file.buffer, `sojaru/hero/${uuidv4()}`); }
+  try { result = await cloudinaryUpload(buffer, `sojaru/hero/${uuidv4()}`); }
   catch (e) { console.error("Hero upload failed:", e); const err = new Error("Upload failed. Please try again."); err.status = 502; throw err; }
   const db = await getDb();
   await db.collection("settings").updateOne({ _id: "site" }, { $push: { hero_images: { id: uuidv4(), url: result.url, public_id: result.public_id, alt: "Sojaru" } } }, { upsert: true });
@@ -382,8 +394,9 @@ app.delete("/api/admin/hero-images/:id", wrap(async (req, res) => {
 app.post("/api/admin/category-images/:slug", upload.single("file"), wrap(async (req, res) => {
   await requireAdmin(req);
   if (!req.file) { const e = new Error("No file uploaded"); e.status = 400; throw e; }
+  const buffer = await fileBuffer(req.file);
   let result;
-  try { result = await cloudinaryUpload(req.file.buffer, `sojaru/categories/${req.params.slug}-${uuidv4()}`); }
+  try { result = await cloudinaryUpload(buffer, `sojaru/categories/${req.params.slug}-${uuidv4()}`); }
   catch (e) { console.error("Category upload failed:", e); const err = new Error("Upload failed. Please try again."); err.status = 502; throw err; }
   const db = await getDb();
   await db.collection("settings").updateOne({ _id: "site" }, { $set: { [`category_images.${req.params.slug}`]: { url: result.url, public_id: result.public_id, id: uuidv4() } } }, { upsert: true });
