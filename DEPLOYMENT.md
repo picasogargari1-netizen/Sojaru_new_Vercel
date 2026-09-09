@@ -35,8 +35,9 @@ All API routes (`/api/*`) are routed to the Python function; everything else ser
 
 1. Go to [vercel.com](https://vercel.com) → **New Project**
 2. Import your GitHub repository
-3. Vercel will auto-detect the `vercel.json` at the root. Leave all framework settings as detected.
-4. **Do not deploy yet** — add env vars first (Step 3)
+3. When Vercel asks to configure the project, set **Framework Preset** to **"Services"** (this matches the `services` key in `vercel.json`)
+4. Leave Root Directory as `/` (project root)
+5. **Do not deploy yet** — add env vars first (Step 3)
 
 ---
 
