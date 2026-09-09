@@ -1,17 +1,9 @@
 {
-  "services": {
-    "web": {
-      "root": "frontend",
-      "framework": "create-react-app"
-    },
-    "api": {
-      "root": "backend",
-      "entrypoint": "server:app",
-      "framework": "fastapi"
-    }
-  },
+  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "cd frontend && yarn install && yarn build",
+  "outputDirectory": "frontend/build",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": { "service": "api" } },
-    { "source": "/(.*)", "destination": { "service": "web" } }
+    { "source": "/api/:path*", "destination": "/api/index" }
   ]
 }

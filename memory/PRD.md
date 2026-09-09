@@ -43,6 +43,15 @@ Build "Sojaru", a custom headless storefront on top of a live WordPress + WooCom
 ## Payment note
 Checkout creates a pending WooCommerce order via REST, then hands off to the store's WooCommerce hosted "order-pay" URL for actual payment (uses whatever gateways the owner configured). No card data touches this app.
 
+## Node.js Backend Rewrite (2026-06)
+- Replaced Python/FastAPI backend with Node.js/Express.js (`api/index.js`)
+- All routes preserved: WooCommerce proxy, auth, settings, admin, Cloudinary uploads, customizable products
+- Serverless-compatible: MongoDB connection cached, multer uses memoryStorage (no filesystem writes)
+- Root `package.json` created with all Node.js dependencies (express, mongodb, bcryptjs, jsonwebtoken, cloudinary, multer, axios, uuid, cors, dotenv)
+- `vercel.json` simplified to `framework:null + buildCommand + outputDirectory + rewrites` (no Python services model)
+- `api/index.py` and `api/requirements.txt` (Python) removed
+- `DEPLOYMENT.md` updated with Node.js deployment steps + Railway.app alternative
+
 ## Cloudinary + Vercel Migration (2026-06)
 - Replaced Emergent object storage with Cloudinary for all image uploads (hero + category)
 - Hero/category image upload endpoints now store Cloudinary CDN URLs (`https://res.cloudinary.com/...`) in MongoDB
