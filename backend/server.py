@@ -6,15 +6,16 @@ import os
 import time
 import uuid
 import logging
-import requests
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Any
 
 import jwt
 import bcrypt
 import httpx
+import cloudinary
+import cloudinary.uploader
 from bson import ObjectId
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Query, Depends, UploadFile, File, Response
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Query, Depends, UploadFile, File
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, Field
@@ -33,45 +34,37 @@ WC_BASE = f"{WC_STORE_URL}/wp-json/wc/v3"
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'hello@sojaru.co.in').lower()
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
-# Object storage
-STORAGE_BASE = (os.environ.get("INTEGRATION_PROXY_URL") or "").strip() or "https://integrations.emergentagent.com"
-STORAGE_URL = STORAGE_BASE.rstrip("/") + "/objstore/api/v1/storage"
-EMERGENT_KEY = os.environ.get("EMERGENT_LLM_KEY")
-APP_NAME = "sojaru"
-_storage_key = None
+# Cloudinary image storage
+cloudinary.config(
+    cloud_name=os.environ["CLOUDINARY_CLOUD_NAME"],
+    api_key=os.environ["CLOUDINARY_API_KEY"],
+    api_secret=os.environ["CLOUDINARY_API_SECRET"],
+    secure=True,
+)
+
 MIME_TYPES = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
               "gif": "image/gif", "webp": "image/webp"}
 
-def init_storage(force: bool = False):
-    global _storage_key
-    if _storage_key and not force:
-        return _storage_key
-    resp = requests.post(f"{STORAGE_URL}/init", json={"emergent_key": EMERGENT_KEY}, timeout=30)
-    resp.raise_for_status()
-    _storage_key = resp.json()["storage_key"]
-    return _storage_key
+async def cloudinary_upload(data: bytes, public_id: str) -> dict:
+    """Upload image bytes to Cloudinary. Returns {url, public_id}."""
+    import asyncio, io as _io
+    result = await asyncio.to_thread(
+        cloudinary.uploader.upload,
+        _io.BytesIO(data),
+        public_id=public_id,
+        resource_type="image",
+        overwrite=True,
+        invalidate=True,
+    )
+    return {"url": result["secure_url"], "public_id": result["public_id"]}
 
-def put_object(path: str, data: bytes, content_type: str) -> dict:
-    key = init_storage()
-    resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                        headers={"X-Storage-Key": key, "Content-Type": content_type},
-                        data=data, timeout=120)
-    if resp.status_code == 404:
-        key = init_storage(force=True)
-        resp = requests.put(f"{STORAGE_URL}/objects/{path}",
-                            headers={"X-Storage-Key": key, "Content-Type": content_type},
-                            data=data, timeout=120)
-    resp.raise_for_status()
-    return resp.json()
-
-def get_object(path: str):
-    key = init_storage()
-    resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    if resp.status_code == 404:
-        key = init_storage(force=True)
-        resp = requests.get(f"{STORAGE_URL}/objects/{path}", headers={"X-Storage-Key": key}, timeout=60)
-    resp.raise_for_status()
-    return resp.content, resp.headers.get("Content-Type", "application/octet-stream")
+async def cloudinary_delete(public_id: str):
+    """Delete an image from Cloudinary by public_id."""
+    import asyncio
+    await asyncio.to_thread(
+        cloudinary.uploader.destroy, public_id,
+        invalidate=True, resource_type="image",
+    )
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sojaru")
@@ -242,12 +235,16 @@ async def resolve_festive_category_id() -> int:
 def public_settings(doc: dict) -> dict:
     festive = doc.get("festive") or {}
     hero = {**DEFAULT_HERO, **(doc.get("hero") or {})}
-    # category_images: {slug: url}
+    # hero_images: only include records with 'url' (Cloudinary). Old 'storage_path' records are defunct.
+    hero_images = [
+        {"id": h["id"], "url": h["url"], "alt": h.get("alt", "Sojaru")}
+        for h in doc.get("hero_images", []) if h.get("url")
+    ]
+    # category_images: only include records with 'url' (Cloudinary)
     raw_cat_imgs = doc.get("category_images") or {}
-    cat_images = {slug: f"/api/media/{v['storage_path']}" for slug, v in raw_cat_imgs.items() if v.get("storage_path")}
+    cat_images = {slug: v["url"] for slug, v in raw_cat_imgs.items() if v.get("url")}
     return {
-        "hero_images": [{"id": h["id"], "url": f"/api/media/{h['storage_path']}", "alt": h.get("alt", "Sojaru")}
-                        for h in doc.get("hero_images", [])],
+        "hero_images": hero_images,
         "hero": hero,
         "marquee_texts": doc.get("marquee_texts", DEFAULT_MARQUEE),
         "festive": {
@@ -569,14 +566,6 @@ async def get_settings():
     return await public_settings_resolved(doc)
 
 
-@api.get("/media/{path:path}")
-async def media(path: str):
-    try:
-        data, content_type = get_object(path)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Image not found")
-    return Response(content=data, media_type=content_type,
-                    headers={"Cache-Control": "public, max-age=86400"})
 
 
 @api.put("/admin/settings")
@@ -622,13 +611,13 @@ async def admin_upload_hero(file: UploadFile = File(...), admin: dict = Depends(
     data = await file.read()
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image too large. Please keep it under 8MB.")
-    path = f"{APP_NAME}/hero/{uuid.uuid4()}.{ext}"
+    public_id = f"sojaru/hero/{uuid.uuid4()}"
     try:
-        result = put_object(path, data, MIME_TYPES[ext])
+        result = await cloudinary_upload(data, public_id)
     except Exception as e:
         logger.error(f"Hero upload failed: {e}")
         raise HTTPException(status_code=502, detail="Upload failed. Please try again.")
-    record = {"id": str(uuid.uuid4()), "storage_path": result["path"], "alt": "Sojaru"}
+    record = {"id": str(uuid.uuid4()), "url": result["url"], "public_id": result["public_id"], "alt": "Sojaru"}
     await db.settings.update_one({"_id": "site"}, {"$push": {"hero_images": record}}, upsert=True)
     doc = await get_settings_doc()
     return public_settings(doc)
@@ -642,13 +631,13 @@ async def admin_upload_category_image(slug: str, file: UploadFile = File(...), a
     data = await file.read()
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image too large. Please keep it under 8MB.")
-    path = f"{APP_NAME}/categories/{slug}-{uuid.uuid4()}.{ext}"
+    public_id = f"sojaru/categories/{slug}-{uuid.uuid4()}"
     try:
-        result = put_object(path, data, MIME_TYPES[ext])
+        result = await cloudinary_upload(data, public_id)
     except Exception as e:
         logger.error(f"Category image upload failed: {e}")
         raise HTTPException(status_code=502, detail="Upload failed. Please try again.")
-    record = {"storage_path": result["path"], "id": str(uuid.uuid4())}
+    record = {"url": result["url"], "public_id": result["public_id"], "id": str(uuid.uuid4())}
     await db.settings.update_one(
         {"_id": "site"},
         {"$set": {f"category_images.{slug}": record}},
@@ -660,17 +649,31 @@ async def admin_upload_category_image(slug: str, file: UploadFile = File(...), a
 
 @api.delete("/admin/category-images/{slug}")
 async def admin_delete_category_image(slug: str, admin: dict = Depends(get_admin_user)):
+    doc = await get_settings_doc()
+    image_record = (doc.get("category_images") or {}).get(slug)
     await db.settings.update_one(
         {"_id": "site"},
         {"$unset": {f"category_images.{slug}": ""}},
     )
+    if image_record and image_record.get("public_id"):
+        try:
+            await cloudinary_delete(image_record["public_id"])
+        except Exception as e:
+            logger.warning(f"Cloudinary delete failed for {image_record['public_id']}: {e}")
     doc = await get_settings_doc()
     return public_settings(doc)
 
 
 @api.delete("/admin/hero-images/{image_id}")
 async def admin_delete_hero(image_id: str, admin: dict = Depends(get_admin_user)):
+    doc = await get_settings_doc()
+    image_record = next((h for h in doc.get("hero_images", []) if h["id"] == image_id), None)
     await db.settings.update_one({"_id": "site"}, {"$pull": {"hero_images": {"id": image_id}}})
+    if image_record and image_record.get("public_id"):
+        try:
+            await cloudinary_delete(image_record["public_id"])
+        except Exception as e:
+            logger.warning(f"Cloudinary delete failed for {image_record['public_id']}: {e}")
     doc = await get_settings_doc()
     return public_settings(doc)
 
@@ -762,11 +765,6 @@ async def startup():
             upd["password_hash"] = hash_password(ADMIN_PASSWORD)
         await db.users.update_one({"email": ADMIN_EMAIL}, {"$set": upd})
     await get_settings_doc()
-    try:
-        init_storage()
-        logger.info("Storage initialized")
-    except Exception as e:
-        logger.error(f"Storage init failed: {e}")
 
 @app.on_event("shutdown")
 async def shutdown():

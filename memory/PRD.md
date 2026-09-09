@@ -43,6 +43,18 @@ Build "Sojaru", a custom headless storefront on top of a live WordPress + WooCom
 ## Payment note
 Checkout creates a pending WooCommerce order via REST, then hands off to the store's WooCommerce hosted "order-pay" URL for actual payment (uses whatever gateways the owner configured). No card data touches this app.
 
+## Cloudinary + Vercel Migration (2026-06)
+- Replaced Emergent object storage with Cloudinary for all image uploads (hero + category)
+- Hero/category image upload endpoints now store Cloudinary CDN URLs (`https://res.cloudinary.com/...`) in MongoDB
+- Delete endpoints also clean up Cloudinary assets by public_id
+- Removed `/api/media/{path}` proxy endpoint (no longer needed — images served directly from Cloudinary CDN)
+- `public_settings()` updated to only return records with `url` field (old `storage_path` records silently skipped)
+- Created `api/index.py` as Vercel Python serverless ASGI entry point
+- Created `vercel.json` with `@vercel/python` + `@vercel/static-build` builders and route config
+- Created `api/requirements.txt` (lean production deps for Vercel function)
+- Fixed `frontend/src/lib/api.js`: `BACKEND_URL` defaults to `""` (relative API calls work on Vercel same-domain), `mediaUrl()` now handles full URLs (Cloudinary) without prepending BACKEND_URL
+- Updated `DEPLOYMENT.md` with full Vercel + GitHub deployment guide
+
 ## Backlog / Future (P1/P2)
 - WooCommerce Store API cart/checkout for fully inline payment.
 - Webhook-based cache invalidation on product update.

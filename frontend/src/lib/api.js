@@ -1,8 +1,13 @@
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/$/, "");
 export const API = `${BACKEND_URL}/api`;
-export const mediaUrl = (url) => (url ? `${BACKEND_URL}${url}` : url);
+// Handle both Cloudinary full URLs and legacy relative /api/media/... paths
+export const mediaUrl = (url) => {
+  if (!url) return url;
+  if (url.startsWith("http://") || url.startsWith("https://")) return url;
+  return `${BACKEND_URL}${url}`;
+};
 
 const client = axios.create({ baseURL: API });
 
