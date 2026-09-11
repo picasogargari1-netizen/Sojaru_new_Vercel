@@ -36,6 +36,7 @@ export const store = {
       .then((r) => asObject(r.data))
       .catch(() => ({ currency_code: "INR", currency_symbol: "₹" })),
   categories: () => client.get("/categories").then((r) => asArray(r.data)).catch(() => []),
+  customizableProducts: () => client.get("/customizable-products").then((r) => asArray(r.data)).catch(() => []),
   settings: () =>
     client
       .get("/settings")
@@ -62,6 +63,9 @@ export const admin = {
   createCustomizableProduct: (body) => client.post("/admin/customizable-products", body).then((r) => r.data),
   updateCustomizableProduct: (id, body) => client.put(`/admin/customizable-products/${id}`, body).then((r) => r.data),
   deleteCustomizableProduct: (id) => client.delete(`/admin/customizable-products/${id}`).then((r) => r.data),
+  // Customized Orders (form submissions)
+  listCustomizedOrders: () => client.get("/admin/customized-orders").then((r) => asArray(r.data)),
+  deleteCustomizedOrder: (id) => client.delete(`/admin/customized-orders/${id}`).then((r) => r.data),
 };
 
 export const products = {
@@ -78,6 +82,7 @@ export const products = {
 
 export const orders = {
   create: (payload) => client.post("/orders", payload).then((r) => r.data),
+  createCustomized: (payload) => client.post("/customized-orders", payload).then((r) => r.data),
   validateCoupon: (code) => client.get("/coupons/validate", { params: { code } }).then((r) => r.data),
 };
 

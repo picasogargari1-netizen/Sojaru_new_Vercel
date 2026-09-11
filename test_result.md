@@ -109,6 +109,21 @@ user_problem_statement: |
   3) Add/update/delete up to 5 hero banner images; only existing images are shown on the homepage.
 
 backend:
+  - task: "Customization feature - 4 new endpoints for customizable products and orders"
+    implemented: true
+    working: true
+    file: "api/index.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Added 4 new Node.js backend endpoints: (1) GET /api/customizable-products (PUBLIC) returns array of customizable products with id, product_type, size, color, material. (2) POST /api/customized-orders (PUBLIC) accepts name, email, phone, product_type (all required) + optional size, color, material; returns {id, ok:true}. (3) GET /api/admin/customized-orders (ADMIN) returns orders sorted newest first. (4) DELETE /api/admin/customized-orders/:id (ADMIN) deletes order and returns {ok:true} or 404 if not found."
+        - working: true
+          agent: "testing"
+          comment: "✅ ALL 20 CUSTOMIZATION API TESTS PASSED (20/20): (1) GET /api/customizable-products returns 200 with array of 2 products (T-shirt, Mug) with correct structure {id, product_type, size, color, material} where size/color/material are comma-separated strings. (2) POST /api/customized-orders with valid data returns 200 {id, ok:true}. (3) POST /api/customized-orders validation: missing 'name' returns 400 ✅, missing 'email' returns 400 ✅, missing 'phone' returns 400 ✅, missing 'product_type' returns 400 ✅ - all with correct error message 'Name, email, phone and product type are required'. (4) GET /api/admin/customized-orders without token correctly returns 401. (5) GET /api/admin/customized-orders with admin token returns 200 with array of orders, correct structure with all fields (id, name, email, phone, product_type, size, color, material, created_at), created test order appears in list. (6) DELETE /api/admin/customized-orders/:id without token correctly returns 401. (7) DELETE /api/admin/customized-orders/:id with admin token returns 200 {ok:true}, order successfully removed from list. (8) DELETE with non-existent ID correctly returns 404. All endpoints working perfectly with correct status codes, validation, authorization, and data structure."
+
   - task: "Deployment fix - backend/.env and frontend/.env creation + CORS + DB query optimizations"
     implemented: true
     working: true
@@ -242,12 +257,12 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 4
+  test_sequence: 5
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Vercel deploy blank screen fix: frontend must never crash on bad/misconfigured backend response; hero banners + WooCommerce products must render"
+    - "Customization feature - 4 new endpoints for customizable products and orders"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -255,22 +270,66 @@ test_plan:
 agent_communication:
     -agent: "main"
     -message: |
-      NEW BUG (2026-07): Deployed Vercel site showed a BLANK white screen. Console error: "s.filter is not a function".
-      Root cause: On Vercel the env var REACT_APP_BACKEND_URL was set to the WooCommerce store URL (https://developer.sojaru.co.in)
-      instead of the Node API origin. Frontend called WordPress, got non-array data, and .filter() on it crashed React -> blank page.
-      Fixes applied:
-      (1) Hardened /app/frontend/src/lib/api.js: store.categories/settings and products.list now ALWAYS coerce to safe shapes
-          (asArray/asObject) so a bad backend response can never crash the app.
-      (2) Defense-in-depth in StoreContext.jsx (guard categories.filter) and Home.jsx (guard hero_images.filter).
-      (3) Instructing user to set REACT_APP_BACKEND_URL to EMPTY on Vercel (same-domain /api works) and redeploy.
-      Preview is correctly configured (REACT_APP_BACKEND_URL = preview URL) and backend returns real data.
+      NEW FEATURE (2026-07): Homepage customization form + admin "Customized Orders".
+      Backend endpoints added to /app/api/index.js (Node.js backend, port 8001):
+      (1) GET  /api/customizable-products  (PUBLIC) -> returns [{id, product_type, size, color, material}] from
+          the customizable_products collection (size/color/material are comma-separated strings).
+      (2) POST /api/customized-orders      (PUBLIC) -> body {name,email,phone,product_type,size,color,material};
+          name+email+phone+product_type are REQUIRED (else 400). Saves to customized_orders with created_at. Returns {id, ok:true}.
+      (3) GET  /api/admin/customized-orders (ADMIN)  -> list newest first. Requires admin JWT.
+      (4) DELETE /api/admin/customized-orders/:id (ADMIN) -> delete one. Requires admin JWT.
 
-      Please TEST FRONTEND on the preview URL:
-      (1) Homepage loads and is NOT blank (root div has content, no "filter is not a function" console error)
-      (2) Hero banner image(s) render in the hero section (data-testid="hero-section" / "hero-dot-0")
-      (3) WooCommerce products render in the product rows on the homepage (product cards with images/prices)
-      (4) Navigate to a shop/category page and confirm products list renders
-      Admin creds if needed: hello@sojaru.co.in / admin123
+      Please TEST BACKEND only for these 4 endpoints:
+      - GET /api/customizable-products returns 200 array (currently has 2 rows: T-shirt, Mug).
+      - POST /api/customized-orders with full valid body returns 200 {id, ok:true}; missing required field returns 400.
+      - Admin endpoints return 401/403 without token; with admin token (login hello@sojaru.co.in / admin123) GET returns the created order and DELETE removes it.
+      - Confirm a submitted order appears in GET /api/admin/customized-orders and can be deleted.
+      Admin creds: hello@sojaru.co.in / admin123
+
+    -agent: "testing"
+    -message: |
+      ✅ CUSTOMIZATION FEATURE BACKEND TESTING COMPLETE - ALL 20 TESTS PASSED (100% SUCCESS RATE)
+      
+      Tested all 4 new Node.js backend endpoints for the customization feature at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/api
+      
+      ENDPOINT 1 - GET /api/customizable-products (PUBLIC): ✅ WORKING (4/4 tests passed)
+      - Returns HTTP 200 with JSON array
+      - Found 2 products as expected: T-shirt and Mug
+      - Correct structure: {id, product_type, size, color, material}
+      - Size/color/material are comma-separated strings (e.g., "S,M,L,XL", "Red,Blue", "100% cutton, Polyester")
+      
+      ENDPOINT 2 - POST /api/customized-orders (PUBLIC): ✅ WORKING (6/6 tests passed)
+      - Valid request with all fields returns HTTP 200 with {id: "...", ok: true}
+      - VALIDATION TESTS (all 4 required fields tested):
+        * Missing 'name' → HTTP 400 with error "Name, email, phone and product type are required" ✅
+        * Missing 'email' → HTTP 400 with error "Name, email, phone and product type are required" ✅
+        * Missing 'phone' → HTTP 400 with error "Name, email, phone and product type are required" ✅
+        * Missing 'product_type' → HTTP 400 with error "Name, email, phone and product type are required" ✅
+      
+      ENDPOINT 3 - GET /api/admin/customized-orders (ADMIN): ✅ WORKING (5/5 tests passed)
+      - Without token → HTTP 401 (correctly rejected) ✅
+      - With admin token (hello@sojaru.co.in / admin123) → HTTP 200 with array of orders
+      - Correct structure: {id, name, email, phone, product_type, size, color, material, created_at}
+      - Test order created in step 2 appears in the list ✅
+      - Orders sorted newest first (verified with created_at timestamps)
+      
+      ENDPOINT 4 - DELETE /api/admin/customized-orders/:id (ADMIN): ✅ WORKING (5/5 tests passed)
+      - Without token → HTTP 401 (correctly rejected) ✅
+      - With admin token → HTTP 200 with {ok: true}
+      - Order successfully removed from list after deletion (verified with GET request) ✅
+      - DELETE non-existent ID → HTTP 404 (correct error handling) ✅
+      
+      CLEANUP: ✅ COMPLETE
+      - All test orders created during testing have been deleted
+      - Database returned to original state
+      
+      CONCLUSION: All 4 customization endpoints are working perfectly with correct status codes (200, 400, 401, 404), proper validation, authorization enforcement, and data structure. No issues found.
+
+    -agent: "main"
+    -message: |
+      (Earlier) Vercel blank-screen fix: hardened /app/frontend/src/lib/api.js + StoreContext/Home guards so a
+      bad/misconfigured backend response can never crash the SPA. Root cause was REACT_APP_BACKEND_URL set to the
+      WooCommerce store URL on Vercel (must be empty for same-domain /api).
     -agent: "testing"
     -message: |
       ✅ DEPLOYMENT FIX VERIFICATION COMPLETE - ALL 6 BACKEND API TESTS PASSED

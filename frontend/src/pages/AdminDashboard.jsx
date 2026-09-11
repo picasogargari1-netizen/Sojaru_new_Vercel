@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package } from "lucide-react";
+import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -405,7 +405,7 @@ function CustomizableProductsManager() {
             {rows.length === 0 && editId !== "new" && (
               <tr>
                 <td colSpan={5} className="py-10 text-center text-sm italic text-ink/40">
-                  No customisable products yet. Click "Add Product" to get started.
+                  No customisable products yet. Click &quot;Add Product&quot; to get started.
                 </td>
               </tr>
             )}
@@ -474,6 +474,73 @@ function CustomizableProductsManager() {
   );
 }
 
+function CustomizedOrdersManager() {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(null);
+
+  const load = async () => {
+    try { setRows(await admin.listCustomizedOrders()); }
+    catch (err) { toast.error(apiErr(err, "Failed to load")); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const remove = async (id) => {
+    setDeleting(id);
+    try {
+      await admin.deleteCustomizedOrder(id);
+      setRows((r) => r.filter((x) => x.id !== id));
+      toast.success("Deleted");
+    } catch (err) { toast.error(apiErr(err)); }
+    finally { setDeleting(null); }
+  };
+
+  const fmtDate = (d) => { if (!d) return "—"; try { return new Date(d).toLocaleString(); } catch { return "—"; } };
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-ink" /></div>;
+
+  return (
+    <div data-testid="customized-orders-manager">
+      <p className="mb-5 text-sm text-muted-foreground">Customization requests submitted from the homepage form.</p>
+      <div className="overflow-x-auto border-2 border-ink">
+        <table className="w-full min-w-[860px] text-sm">
+          <thead className="bg-ink text-cream">
+            <tr>
+              {["Date", "Name", "Email", "Phone", "Product Type", "Size", "Color", "Material"].map((h) => (
+                <th key={h} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-widest">{h}</th>
+              ))}
+              <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-widest">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={9} className="py-10 text-center text-sm italic text-ink/40">No customization requests yet.</td></tr>
+            )}
+            {rows.map((row) => (
+              <tr key={row.id} className="border-b border-ink/10 odd:bg-cream even:bg-oat/30 transition-colors hover:bg-softyellow/60" data-testid={`co-row-${row.id}`}>
+                <td className="whitespace-nowrap px-3 py-3 text-ink/70">{fmtDate(row.created_at)}</td>
+                <td className="px-3 py-3 text-ink/80">{row.name || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.email || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.phone || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.product_type || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.size || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.color || "—"}</td>
+                <td className="px-3 py-3 text-ink/80">{row.material || "—"}</td>
+                <td className="px-3 py-3 text-right">
+                  <button onClick={() => remove(row.id)} disabled={deleting === row.id} data-testid={`co-delete-btn-${row.id}`} className="ml-auto flex items-center gap-1 border border-destructive px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-white disabled:opacity-30">
+                    {deleting === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />} Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   usePageMeta({ title: "Admin Dashboard — Sojaru" });
   const { user, ready, logout } = useAuth();
@@ -499,6 +566,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="festive" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-festive"><Sparkles className="mr-2 h-4 w-4" /> Festive Collection</TabsTrigger>
           <TabsTrigger value="categories" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-categories"><Grid3x3 className="mr-2 h-4 w-4" /> Category Images</TabsTrigger>
           <TabsTrigger value="customizable" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-customizable"><Package className="mr-2 h-4 w-4" /> Customizable Products</TabsTrigger>
+          <TabsTrigger value="customized-orders" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-customized-orders"><ClipboardList className="mr-2 h-4 w-4" /> Customized Orders</TabsTrigger>
         </TabsList>
         <TabsContent value="hero"><HeroManager /></TabsContent>
         <TabsContent value="herotext"><HeroTextManager /></TabsContent>
@@ -506,6 +574,7 @@ export default function AdminDashboard() {
         <TabsContent value="festive"><FestiveManager /></TabsContent>
         <TabsContent value="categories"><CategoryImagesManager /></TabsContent>
         <TabsContent value="customizable"><CustomizableProductsManager /></TabsContent>
+        <TabsContent value="customized-orders"><CustomizedOrdersManager /></TabsContent>
       </Tabs>
     </div>
   );

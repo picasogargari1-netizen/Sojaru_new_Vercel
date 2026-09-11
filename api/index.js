@@ -445,6 +445,68 @@ app.delete("/api/admin/customizable-products/:id", wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// ─── Customization form (public) + Customized Orders (admin) ──────────────────
+// Public: list customizable products used to build the homepage form dropdowns
+app.get("/api/customizable-products", wrap(async (req, res) => {
+  const db = await getDb();
+  const docs = await db.collection("customizable_products").find({}).sort({ _id: 1 }).toArray();
+  res.json(docs.map((d) => ({ id: d._id.toString(), product_type: d.product_type || "", size: d.size || "", color: d.color || "", material: d.material || "" })));
+}));
+
+// Public: submit a customization order request
+app.post("/api/customized-orders", wrap(async (req, res) => {
+  const db = await getDb();
+  const b = req.body || {};
+  const name = (b.name || "").trim();
+  const email = (b.email || "").trim();
+  const phone = (b.phone || "").trim();
+  const product_type = (b.product_type || "").trim();
+  if (!name || !email || !phone || !product_type) {
+    const e = new Error("Name, email, phone and product type are required");
+    e.status = 400;
+    throw e;
+  }
+  const doc = {
+    name,
+    email,
+    phone,
+    product_type,
+    size: (b.size || "").trim(),
+    color: (b.color || "").trim(),
+    material: (b.material || "").trim(),
+    created_at: new Date(),
+  };
+  const result = await db.collection("customized_orders").insertOne(doc);
+  res.json({ id: result.insertedId.toString(), ok: true });
+}));
+
+// Admin: list customized orders (newest first)
+app.get("/api/admin/customized-orders", wrap(async (req, res) => {
+  await requireAdmin(req);
+  const db = await getDb();
+  const docs = await db.collection("customized_orders").find({}).sort({ created_at: -1 }).toArray();
+  res.json(docs.map((d) => ({
+    id: d._id.toString(),
+    name: d.name || "",
+    email: d.email || "",
+    phone: d.phone || "",
+    product_type: d.product_type || "",
+    size: d.size || "",
+    color: d.color || "",
+    material: d.material || "",
+    created_at: d.created_at || null,
+  })));
+}));
+
+// Admin: delete a customized order
+app.delete("/api/admin/customized-orders/:id", wrap(async (req, res) => {
+  await requireAdmin(req);
+  const db = await getDb();
+  const result = await db.collection("customized_orders").deleteOne({ _id: new ObjectId(req.params.id) });
+  if (!result.deletedCount) { const e = new Error("Not found"); e.status = 404; throw e; }
+  res.json({ ok: true });
+}));
+
 // ─── Export for Vercel serverless ─────────────────────────────────────────────
 module.exports = app;
 

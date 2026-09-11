@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 import { useProducts } from "@/hooks/useProducts";
 import { ProductRow } from "@/components/ProductRow";
 import { catImage } from "@/lib/assets";
-import { mediaUrl } from "@/lib/api";
+import { mediaUrl, store, orders, apiErr } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 // ─── 1. HERO ──────────────────────────────────────────────────────────────────
@@ -78,21 +82,136 @@ function Hero() {
   );
 }
 
-// ─── 2. WELCOME MESSAGE ───────────────────────────────────────────────────────
-function WelcomeMessage() {
+// ─── 2. CUSTOMIZE SECTION (video + message + customization form) ──────────────
+const splitOpts = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
+const EMPTY_FORM = { name: "", email: "", phone: "", product_type: "", size: "", color: "", material: "" };
+
+function CustomizeSection() {
+  const [cprods, setCprods] = useState([]);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    store.customizableProducts().then(setCprods).catch(() => setCprods([]));
+  }, []);
+
+  // Unique product types (first matching row supplies the option lists)
+  const productTypes = [];
+  const seen = new Set();
+  for (const p of cprods) {
+    const t = (p.product_type || "").trim();
+    if (t && !seen.has(t)) { seen.add(t); productTypes.push(t); }
+  }
+  const selectedRow = cprods.find((p) => (p.product_type || "").trim() === form.product_type);
+  const sizeOpts = splitOpts(selectedRow?.size);
+  const colorOpts = splitOpts(selectedRow?.color);
+  const materialOpts = splitOpts(selectedRow?.material);
+
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const onProductType = (v) => setForm((f) => ({ ...f, product_type: v, size: "", color: "", material: "" }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !form.product_type) {
+      toast.error("Please fill in your name, email, phone and product type.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await orders.createCustomized(form);
+      toast.success("Thanks! We've received your customization request 🐾");
+      setForm(EMPTY_FORM);
+    } catch (err) {
+      toast.error(apiErr(err, "Could not submit right now. Please try again."));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const inputCls = "h-11 rounded-none border-2 border-ink bg-cream text-ink placeholder:text-ink/40";
+  const selectCls = "h-11 rounded-none border-2 border-ink bg-cream text-ink";
+
   return (
-    <section className="bg-cream py-16 sm:py-20">
-      <div className="mx-auto max-w-2xl px-6 text-center">
-        <h2 className="font-display text-3xl italic text-ink sm:text-4xl lg:text-5xl">
-          hello! welcome home&nbsp;:)
+    <section className="bg-cream py-16 sm:py-20" data-testid="customize-section">
+      <div className="mx-auto max-w-3xl px-6">
+        {/* Video (behaves like a GIF) */}
+        <div className="mx-auto mb-8 max-w-md overflow-hidden border-2 border-ink bg-ink/5">
+          <video
+            src="/customize.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="h-full w-full object-cover"
+            data-testid="customize-video"
+          />
+        </div>
+
+        <h2 className="mx-auto max-w-2xl text-center font-display text-2xl italic text-ink sm:text-3xl lg:text-4xl" data-testid="customize-message">
+          Even Tintin would love to customize something for himself and Snowy. Would you? 🐾
         </h2>
-        <p className="mx-auto mt-6 max-w-lg text-base leading-relaxed text-ink/55">
-          we&apos;re a bohemian lifestyle brand for people who like their homes a little
-          imperfect, a little expressive, and full of heart.
-        </p>
-        <p className="mt-5 font-display text-xl italic text-ink/60">
-          come in. stay a while.
-        </p>
+
+        {/* Form */}
+        <form onSubmit={submit} className="mx-auto mt-10 max-w-2xl" data-testid="customize-form">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Name</label>
+              <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Tintin" className={inputCls} data-testid="cf-name" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Email Id</label>
+              <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} placeholder="you@example.com" className={inputCls} data-testid="cf-email" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Phone No</label>
+              <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="9876543210" className={inputCls} data-testid="cf-phone" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Product Type</label>
+              <Select value={form.product_type} onValueChange={onProductType}>
+                <SelectTrigger className={selectCls} data-testid="cf-product-type"><SelectValue placeholder="Select a product" /></SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                  {productTypes.length === 0 ? (
+                    <div className="px-3 py-2 text-xs italic text-ink/40">No customizable products yet</div>
+                  ) : (
+                    productTypes.map((t) => <SelectItem key={t} value={t} className="rounded-none">{t}</SelectItem>)
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Size</label>
+              <Select value={form.size} onValueChange={(v) => setField("size", v)} disabled={!form.product_type || sizeOpts.length === 0}>
+                <SelectTrigger className={selectCls} data-testid="cf-size"><SelectValue placeholder={form.product_type ? (sizeOpts.length ? "Select size" : "—") : "Pick product first"} /></SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                  {sizeOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Color</label>
+              <Select value={form.color} onValueChange={(v) => setField("color", v)} disabled={!form.product_type || colorOpts.length === 0}>
+                <SelectTrigger className={selectCls} data-testid="cf-color"><SelectValue placeholder={form.product_type ? (colorOpts.length ? "Select color" : "—") : "Pick product first"} /></SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                  {colorOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Material</label>
+              <Select value={form.material} onValueChange={(v) => setField("material", v)} disabled={!form.product_type || materialOpts.length === 0}>
+                <SelectTrigger className={selectCls} data-testid="cf-material"><SelectValue placeholder={form.product_type ? (materialOpts.length ? "Select material" : "—") : "Pick product first"} /></SelectTrigger>
+                <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                  {materialOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <Button type="submit" disabled={submitting} data-testid="cf-submit" className="mt-8 h-12 w-full rounded-none bg-ink font-bold uppercase tracking-widest text-cream hover:bg-yellow hover:text-ink sm:w-auto sm:px-12">
+            {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…</> : "Submit request"}
+          </Button>
+        </form>
       </div>
     </section>
   );
@@ -349,7 +468,8 @@ export default function Home() {
     <>
       <Hero />
       <WarmMarquee />
-      <WelcomeMessage />
+      <CustomizeSection />
+
       <FestiveSection />
       <CategoryRow />
       <ProductSection
