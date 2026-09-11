@@ -25,10 +25,30 @@ export function apiErr(e, fallback = "Something went wrong. Please try again.") 
   return d?.msg || fallback;
 }
 
+// Defensive coercion — never let a bad/misconfigured backend response crash the app
+const asArray = (d) => (Array.isArray(d) ? d : []);
+const asObject = (d) => (d && typeof d === "object" && !Array.isArray(d) ? d : {});
+
 export const store = {
-  config: () => client.get("/store/config").then((r) => r.data),
-  categories: () => client.get("/categories").then((r) => r.data),
-  settings: () => client.get("/settings").then((r) => r.data),
+  config: () =>
+    client
+      .get("/store/config")
+      .then((r) => asObject(r.data))
+      .catch(() => ({ currency_code: "INR", currency_symbol: "₹" })),
+  categories: () => client.get("/categories").then((r) => asArray(r.data)).catch(() => []),
+  settings: () =>
+    client
+      .get("/settings")
+      .then((r) => {
+        const d = asObject(r.data);
+        return {
+          ...d,
+          hero_images: asArray(d.hero_images),
+          marquee_texts: asArray(d.marquee_texts),
+          category_images: asObject(d.category_images),
+        };
+      })
+      .catch(() => null),
 };
 
 export const admin = {
@@ -45,11 +65,15 @@ export const admin = {
 };
 
 export const products = {
-  list: (params) => client.get("/products", { params }).then((r) => r.data),
+  list: (params) =>
+    client.get("/products", { params }).then((r) => {
+      const d = asObject(r.data);
+      return { items: asArray(d.items), total: d.total || 0, pages: d.pages || 1, page: d.page || 1 };
+    }),
   bySlug: (slug) => client.get(`/products/slug/${slug}`).then((r) => r.data),
   byId: (id) => client.get(`/products/${id}`).then((r) => r.data),
-  variations: (id) => client.get(`/products/${id}/variations`).then((r) => r.data),
-  related: (id) => client.get(`/related/${id}`).then((r) => r.data),
+  variations: (id) => client.get(`/products/${id}/variations`).then((r) => asArray(r.data)),
+  related: (id) => client.get(`/related/${id}`).then((r) => asArray(r.data)),
 };
 
 export const orders = {

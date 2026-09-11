@@ -11,7 +11,7 @@ import { usePageMeta } from "@/hooks/usePageMeta";
 // ─── 1. HERO ──────────────────────────────────────────────────────────────────
 function Hero() {
   const { settings } = useStore();
-  const heroImages = (settings?.hero_images || []).filter((h) => h.url);
+  const heroImages = (Array.isArray(settings?.hero_images) ? settings.hero_images : []).filter((h) => h.url);
   const heroText = settings?.hero?.subtitle || "";
   const [idx, setIdx] = useState(0);
 

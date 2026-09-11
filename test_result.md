@@ -242,13 +242,12 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 3
+  test_sequence: 4
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Deployment fix - backend/.env and frontend/.env creation + CORS + DB query optimizations"
-    - "Core API health: categories, products, settings, auth"
+    - "Vercel deploy blank screen fix: frontend must never crash on bad/misconfigured backend response; hero banners + WooCommerce products must render"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -256,19 +255,22 @@ test_plan:
 agent_communication:
     -agent: "main"
     -message: |
-      Deployment was failing due to missing backend/.env and frontend/.env files. Fixed by:
-      (1) Created /app/backend/.env with MONGO_URL, DB_NAME, WC_STORE_URL, WC_CONSUMER_KEY, WC_CONSUMER_SECRET, JWT_SECRET, ADMIN_EMAIL, ADMIN_PASSWORD, CORS_ORIGINS=*
-      (2) Created /app/frontend/.env with REACT_APP_BACKEND_URL
-      (3) Added MongoDB query projections to 5 find_one calls in server.py for performance
-      Deployment agent returned status: PASS with zero findings.
-      
-      Please test BACKEND only: 
-      (1) GET /api/categories returns data from WooCommerce (www.sojaru.co.in)
-      (2) GET /api/products returns products
-      (3) GET /api/settings returns MongoDB-stored settings
-      (4) POST /api/auth/login with hello@sojaru.co.in / admin123 returns token and is_admin=true
-      (5) Auth projection fix: verify GET /api/auth/me works after login
-      Admin creds: hello@sojaru.co.in / admin123
+      NEW BUG (2026-07): Deployed Vercel site showed a BLANK white screen. Console error: "s.filter is not a function".
+      Root cause: On Vercel the env var REACT_APP_BACKEND_URL was set to the WooCommerce store URL (https://developer.sojaru.co.in)
+      instead of the Node API origin. Frontend called WordPress, got non-array data, and .filter() on it crashed React -> blank page.
+      Fixes applied:
+      (1) Hardened /app/frontend/src/lib/api.js: store.categories/settings and products.list now ALWAYS coerce to safe shapes
+          (asArray/asObject) so a bad backend response can never crash the app.
+      (2) Defense-in-depth in StoreContext.jsx (guard categories.filter) and Home.jsx (guard hero_images.filter).
+      (3) Instructing user to set REACT_APP_BACKEND_URL to EMPTY on Vercel (same-domain /api works) and redeploy.
+      Preview is correctly configured (REACT_APP_BACKEND_URL = preview URL) and backend returns real data.
+
+      Please TEST FRONTEND on the preview URL:
+      (1) Homepage loads and is NOT blank (root div has content, no "filter is not a function" console error)
+      (2) Hero banner image(s) render in the hero section (data-testid="hero-section" / "hero-dot-0")
+      (3) WooCommerce products render in the product rows on the homepage (product cards with images/prices)
+      (4) Navigate to a shop/category page and confirm products list renders
+      Admin creds if needed: hello@sojaru.co.in / admin123
     -agent: "testing"
     -message: |
       ✅ DEPLOYMENT FIX VERIFICATION COMPLETE - ALL 6 BACKEND API TESTS PASSED
@@ -491,6 +493,24 @@ agent_communication:
       - ✅ Category tiles show horizontal scroll on mobile, grid on desktop (intentional)
       
       CONCLUSION: Homepage redesign is fully working and successfully matches hyppy.in's boho/elegant aesthetic. All 9 sections rendering correctly with proper fonts, colors, and responsive behavior.
+
+  - task: "User-reported issue: Hero banner images and WooCommerce products not showing"
+    implemented: true
+    working: true
+    file: "backend/.env, frontend/.env, frontend/src/pages/Home.jsx, frontend/src/lib/product.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "User reported that banner (hero) images and WooCommerce products were not showing on the homepage at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/"
+        - working: true
+          agent: "main"
+          comment: "Fixed backend env config. The issue was likely due to missing or incorrect environment variables in backend/.env that prevented proper data loading from MongoDB (hero images) and WooCommerce (products)."
+        - working: true
+          agent: "testing"
+          comment: "✅ USER-REPORTED ISSUE VERIFIED AS FIXED - ALL CRITICAL ELEMENTS NOW WORKING. Tested homepage at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/ with 8-second wait for API data loading. HERO BANNER IMAGE: ✅ WORKING - Hero section (data-testid='hero-section') contains 1 hero image (NOT the dark fallback div). Image src: https://res.cloudinary.com/gmek0njq/image/upload/v1788979800/sojaru/hero/a507fc65-480e-40eb-9089-97d3541257b3.jpg (Cloudinary URL confirmed). Image displays correctly with opacity-100 class. WOOCOMMERCE PRODUCTS: ✅ WORKING - 27 product cards rendering on homepage with correct data from WooCommerce API. Products display: titles (e.g., 'Floral Print Dog T-Shirt', 'Chai Ritual Gift Hamper', 'Soy Candle Gift Set — 3 Scents'), prices (₹349, ₹999, ₹899), categories (FESTIVE COLLECTIONS, BEST SELLERS, DECORS), sale badges, and NEW badges. Product images showing placeholders (placehold.co) because WooCommerce products have empty images arrays in API response - this is expected fallback behavior, not a bug. CATEGORY IMAGES: ✅ WORKING - Category bento grid (data-testid='category-bento-grid') displays 10 category tiles with Cloudinary images. First category tile image: https://res.cloudinary.com/gmek0njq/image/upload/v1788979841/sojaru/categories/... API HEALTH: ✅ ALL APIS SUCCESSFUL - /api/products (200), /api/categories (200), /api/settings (200). Zero console errors. Zero network errors. FESTIVE SECTION: ✅ VISIBLE - 'Durga Pujo Collections' section rendering with 3 product cards. CONCLUSION: Both user-reported issues are FIXED. Hero banner image displays correctly (Cloudinary URL). WooCommerce products display correctly (27 cards with names, prices, categories from WooCommerce API). Product placeholder images are expected behavior when WooCommerce products lack image data."
 
 ## frontend:
   - task: "Hyppy.in theme redesign - fonts, colors, layout structure"

@@ -39,11 +39,12 @@ export function StoreProvider({ children }) {
     }
   };
 
-  const parents = categories.filter((c) => c.parent === 0);
+  const catList = Array.isArray(categories) ? categories : [];
+  const parents = catList.filter((c) => c.parent === 0);
   const forYou = parents.find((c) => c.slug === FOR_YOU_SLUG);
   const forPet = parents.find((c) => c.slug === FOR_PET_SLUG);
-  const childrenOf = (id) => categories.filter((c) => c.parent === id);
-  const bySlug = (slug) => categories.find((c) => c.slug === slug);
+  const childrenOf = (id) => catList.filter((c) => c.parent === id);
+  const bySlug = (slug) => catList.find((c) => c.slug === slug);
 
   return (
     <StoreContext.Provider
