@@ -1,5 +1,5 @@
 // Load .env for local dev only. On Vercel, env vars come from the dashboard.
-const envPath = require("path").join(__dirname, "..", "backend", ".env");
+const envPath = require("path").join(__dirname, "..", ".env");
 require("dotenv").config({ path: envPath, override: false });
 
 const express = require("express");
