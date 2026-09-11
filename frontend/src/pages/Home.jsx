@@ -84,11 +84,12 @@ function Hero() {
 
 // ─── 2. CUSTOMIZE SECTION (video + message + customization form) ──────────────
 const splitOpts = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
-const EMPTY_FORM = { name: "", email: "", phone: "", product_type: "", size: "", color: "", material: "" };
+const EMPTY_FORM = { name: "", email: "", phone: "", product_type: "", size: "", color: "", material: "", additional_instructions: "" };
 
 function CustomizeSection() {
   const [cprods, setCprods] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [files, setFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -112,15 +113,21 @@ function CustomizeSection() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !form.product_type) {
-      toast.error("Please fill in your name, email, phone and product type.");
+    const required = ["name", "email", "phone", "product_type", "size", "color", "material"];
+    const missing = required.some((k) => !String(form[k] || "").trim());
+    if (missing) {
+      toast.error("Please fill in all required fields.");
       return;
     }
     setSubmitting(true);
     try {
-      await orders.createCustomized(form);
+      const fd = new FormData();
+      Object.entries(form).forEach(([k, v]) => fd.append(k, v ?? ""));
+      files.forEach((f) => fd.append("design_files", f));
+      await orders.createCustomized(fd);
       toast.success("Thanks! We've received your customization request 🐾");
       setForm(EMPTY_FORM);
+      setFiles([]);
     } catch (err) {
       toast.error(apiErr(err, "Could not submit right now. Please try again."));
     } finally {
@@ -128,46 +135,46 @@ function CustomizeSection() {
     }
   };
 
-  const inputCls = "h-11 rounded-none border-2 border-ink bg-cream text-ink placeholder:text-ink/40";
-  const selectCls = "h-11 rounded-none border-2 border-ink bg-cream text-ink";
+  const inputCls = "h-9 rounded-none border border-cream/70 bg-white/10 text-xs text-cream placeholder:text-cream/50 focus-visible:ring-cream/60";
+  const selectCls = "h-9 rounded-none border border-cream/70 bg-white/10 text-xs text-cream";
 
   return (
-    <section className="bg-cream py-16 sm:py-20" data-testid="customize-section">
-      <div className="mx-auto max-w-3xl px-6">
-        {/* Video (behaves like a GIF) */}
-        <div className="mx-auto mb-8 max-w-md overflow-hidden border-2 border-ink bg-ink/5">
-          <video
-            src="/customize.mp4"
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="h-full w-full object-cover"
-            data-testid="customize-video"
-          />
-        </div>
+    <section className="relative min-h-screen w-full overflow-hidden bg-ink" data-testid="customize-section">
+      {/* Fullscreen background video (behaves like a GIF) */}
+      <video
+        src="/customize.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 h-full w-full object-cover"
+        data-testid="customize-video"
+      />
+      {/* Subtle overlay so the transparent form stays readable over the video */}
+      <div className="absolute inset-0 bg-ink/45" />
 
-        <h2 className="mx-auto max-w-2xl text-center font-display text-2xl italic text-ink sm:text-3xl lg:text-4xl" data-testid="customize-message">
+      {/* Message centered at top; transparent form aligned to the RIGHT of the section */}
+      <div className="relative z-10 flex min-h-screen flex-col justify-center gap-6 px-4 py-12 sm:px-8 lg:px-16">
+        <h2 className="mx-auto max-w-2xl text-center font-display text-base italic leading-snug text-cream drop-shadow-md sm:text-lg" data-testid="customize-message">
           Even Tintin would love to customize something for himself and Snowy. Would you? 🐾
         </h2>
 
-        {/* Form */}
-        <form onSubmit={submit} className="mx-auto mt-10 max-w-2xl" data-testid="customize-form">
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {/* Form (right-aligned) */}
+        <form onSubmit={submit} className="w-full max-w-sm space-y-2.5 sm:ml-auto" data-testid="customize-form">
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Name</label>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Your Name</label>
               <Input value={form.name} onChange={(e) => setField("name", e.target.value)} placeholder="Tintin" className={inputCls} data-testid="cf-name" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Email Id</label>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Your Email Id</label>
               <Input type="email" value={form.email} onChange={(e) => setField("email", e.target.value)} placeholder="you@example.com" className={inputCls} data-testid="cf-email" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Your Phone No</label>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Your Phone No</label>
               <Input value={form.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="9876543210" className={inputCls} data-testid="cf-phone" />
             </div>
             <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Product Type</label>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Product Type</label>
               <Select value={form.product_type} onValueChange={onProductType}>
                 <SelectTrigger className={selectCls} data-testid="cf-product-type"><SelectValue placeholder="Select a product" /></SelectTrigger>
                 <SelectContent className="rounded-none border-2 border-ink bg-cream">
@@ -179,39 +186,64 @@ function CustomizeSection() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Size</label>
-              <Select value={form.size} onValueChange={(v) => setField("size", v)} disabled={!form.product_type || sizeOpts.length === 0}>
-                <SelectTrigger className={selectCls} data-testid="cf-size"><SelectValue placeholder={form.product_type ? (sizeOpts.length ? "Select size" : "—") : "Pick product first"} /></SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-ink bg-cream">
-                  {sizeOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Size</label>
+                <Select value={form.size} onValueChange={(v) => setField("size", v)} disabled={!form.product_type || sizeOpts.length === 0}>
+                  <SelectTrigger className={selectCls} data-testid="cf-size"><SelectValue placeholder={form.product_type ? (sizeOpts.length ? "Size" : "—") : "—"} /></SelectTrigger>
+                  <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                    {sizeOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Color</label>
+                <Select value={form.color} onValueChange={(v) => setField("color", v)} disabled={!form.product_type || colorOpts.length === 0}>
+                  <SelectTrigger className={selectCls} data-testid="cf-color"><SelectValue placeholder={form.product_type ? (colorOpts.length ? "Color" : "—") : "—"} /></SelectTrigger>
+                  <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                    {colorOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Material</label>
+                <Select value={form.material} onValueChange={(v) => setField("material", v)} disabled={!form.product_type || materialOpts.length === 0}>
+                  <SelectTrigger className={selectCls} data-testid="cf-material"><SelectValue placeholder={form.product_type ? (materialOpts.length ? "Material" : "—") : "—"} /></SelectTrigger>
+                  <SelectContent className="rounded-none border-2 border-ink bg-cream">
+                    {materialOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Color</label>
-              <Select value={form.color} onValueChange={(v) => setField("color", v)} disabled={!form.product_type || colorOpts.length === 0}>
-                <SelectTrigger className={selectCls} data-testid="cf-color"><SelectValue placeholder={form.product_type ? (colorOpts.length ? "Select color" : "—") : "Pick product first"} /></SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-ink bg-cream">
-                  {colorOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-ink">Material</label>
-              <Select value={form.material} onValueChange={(v) => setField("material", v)} disabled={!form.product_type || materialOpts.length === 0}>
-                <SelectTrigger className={selectCls} data-testid="cf-material"><SelectValue placeholder={form.product_type ? (materialOpts.length ? "Select material" : "—") : "Pick product first"} /></SelectTrigger>
-                <SelectContent className="rounded-none border-2 border-ink bg-cream">
-                  {materialOpts.map((o) => <SelectItem key={o} value={o} className="rounded-none">{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <Button type="submit" disabled={submitting} data-testid="cf-submit" className="mt-8 h-12 w-full rounded-none bg-ink font-bold uppercase tracking-widest text-cream hover:bg-yellow hover:text-ink sm:w-auto sm:px-12">
-            {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…</> : "Submit request"}
-          </Button>
-        </form>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Your Design Idea <span className="normal-case text-cream/50">(optional — attach documents)</span></label>
+              <input
+                type="file"
+                multiple
+                accept="image/*,.pdf,.doc,.docx,.txt"
+                onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                data-testid="cf-design-files"
+                className="block w-full text-xs text-cream/80 file:mr-3 file:cursor-pointer file:border file:border-cream/70 file:bg-white/10 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:uppercase file:tracking-widest file:text-cream hover:file:bg-white/20"
+              />
+              {files.length > 0 && <p className="mt-1 text-[10px] text-cream/60" data-testid="cf-files-count">{files.length} file(s) selected</p>}
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-widest text-cream/90">Additional Design Instructions <span className="normal-case text-cream/50">(optional)</span></label>
+              <textarea
+                value={form.additional_instructions}
+                onChange={(e) => setField("additional_instructions", e.target.value)}
+                rows={2}
+                placeholder="Any specific details…"
+                data-testid="cf-instructions"
+                className="w-full rounded-none border border-cream/70 bg-white/10 px-3 py-2 text-xs text-cream placeholder:text-cream/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cream/60"
+              />
+            </div>
+
+            <Button type="submit" disabled={submitting} data-testid="cf-submit" className="mt-3 h-10 w-full rounded-none bg-cream text-xs font-bold uppercase tracking-widest text-ink hover:bg-yellow hover:text-ink">
+              {submitting ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Sending…</> : "Submit request"}
+            </Button>
+          </form>
       </div>
     </section>
   );

@@ -78,3 +78,10 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Added `engines.node: 20.x` to root `package.json`; standardized root on npm (package-lock.json, removed stray yarn.lock).
 - Added `.vercelignore` to exclude the legacy Python backend, tests, reports, and non-Vercel artifacts from the deploy.
 - Verified: frontend `yarn build` succeeds, `--frozen-lockfile` in sync, Node API (`api/index.js`) boots and serves `/api` routes.
+
+## Homepage Customization Feature (2026-07)
+- Replaced the "hello! welcome home" welcome block with a FULLSCREEN background video (/frontend/public/customize.mp4, served statically), a centered message, and a right-aligned transparent customization form.
+- Form fields: Name, Email, Phone (inputs), Product Type/Size/Color/Material (dependent dropdowns sourced from the existing customizable_products admin table; size/color/material comma-split), plus optional "Your Design Idea" (multi-file upload -> Cloudinary resource_type auto) and "Additional Design Instructions" (textarea). All fields required except the two optional ones.
+- New backend endpoints in api/index.js: GET /api/customizable-products (public), POST /api/customized-orders (public, multipart w/ upload.array design_files), GET /api/admin/customized-orders (admin), DELETE /api/admin/customized-orders/:id (admin). Stored in customized_orders collection.
+- Admin: new "Customized Orders" tab lists all submissions (incl. instructions + clickable Cloudinary design-file links) with per-row delete.
+- Verified: backend 20/20 + multipart upload; frontend 12/12 via testing agent.

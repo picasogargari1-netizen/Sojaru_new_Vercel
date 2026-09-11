@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package, ClipboardList } from "lucide-react";
+import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package, ClipboardList, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -504,10 +504,10 @@ function CustomizedOrdersManager() {
     <div data-testid="customized-orders-manager">
       <p className="mb-5 text-sm text-muted-foreground">Customization requests submitted from the homepage form.</p>
       <div className="overflow-x-auto border-2 border-ink">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-ink text-cream">
             <tr>
-              {["Date", "Name", "Email", "Phone", "Product Type", "Size", "Color", "Material"].map((h) => (
+              {["Date", "Name", "Email", "Phone", "Product Type", "Size", "Color", "Material", "Instructions", "Design Files"].map((h) => (
                 <th key={h} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-widest">{h}</th>
               ))}
               <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-widest">Actions</th>
@@ -515,7 +515,7 @@ function CustomizedOrdersManager() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={9} className="py-10 text-center text-sm italic text-ink/40">No customization requests yet.</td></tr>
+              <tr><td colSpan={11} className="py-10 text-center text-sm italic text-ink/40">No customization requests yet.</td></tr>
             )}
             {rows.map((row) => (
               <tr key={row.id} className="border-b border-ink/10 odd:bg-cream even:bg-oat/30 transition-colors hover:bg-softyellow/60" data-testid={`co-row-${row.id}`}>
@@ -527,6 +527,18 @@ function CustomizedOrdersManager() {
                 <td className="px-3 py-3 text-ink/80">{row.size || "—"}</td>
                 <td className="px-3 py-3 text-ink/80">{row.color || "—"}</td>
                 <td className="px-3 py-3 text-ink/80">{row.material || "—"}</td>
+                <td className="max-w-[220px] px-3 py-3 text-ink/70">{row.additional_instructions ? <span className="whitespace-pre-wrap">{row.additional_instructions}</span> : "—"}</td>
+                <td className="px-3 py-3 text-ink/80">
+                  {Array.isArray(row.design_files) && row.design_files.length > 0 ? (
+                    <div className="flex flex-col gap-1">
+                      {row.design_files.map((f, i) => (
+                        <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-ink underline underline-offset-2 hover:text-yellow-700">
+                          <Paperclip className="h-3 w-3" /> {f.name || `File ${i + 1}`}
+                        </a>
+                      ))}
+                    </div>
+                  ) : "—"}
+                </td>
                 <td className="px-3 py-3 text-right">
                   <button onClick={() => remove(row.id)} disabled={deleting === row.id} data-testid={`co-delete-btn-${row.id}`} className="ml-auto flex items-center gap-1 border border-destructive px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive hover:text-white disabled:opacity-30">
                     {deleting === row.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />} Delete

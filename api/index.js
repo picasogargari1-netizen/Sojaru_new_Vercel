@@ -165,6 +165,17 @@ function cloudinaryUpload(buffer, publicId) {
 }
 const cloudinaryDelete = (publicId) => cloudinary.uploader.destroy(publicId, { resource_type: "image", invalidate: true });
 
+// Upload arbitrary documents/images (auto-detect type) for customization design files
+function cloudinaryUploadAuto(buffer, publicId) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { public_id: publicId, resource_type: "auto", overwrite: true, invalidate: true },
+      (err, result) => err ? reject(err) : resolve({ url: result.secure_url, public_id: result.public_id })
+    );
+    stream.end(buffer);
+  });
+}
+
 // ─── Admin seed ───────────────────────────────────────────────────────────────
 async function _seedAdmin(db) {
   await db.collection("users").createIndex({ email: 1 }, { unique: true });
@@ -453,27 +464,42 @@ app.get("/api/customizable-products", wrap(async (req, res) => {
   res.json(docs.map((d) => ({ id: d._id.toString(), product_type: d.product_type || "", size: d.size || "", color: d.color || "", material: d.material || "" })));
 }));
 
-// Public: submit a customization order request
-app.post("/api/customized-orders", wrap(async (req, res) => {
+// Public: submit a customization order request (accepts optional design file attachments)
+app.post("/api/customized-orders", upload.array("design_files", 5), wrap(async (req, res) => {
   const db = await getDb();
   const b = req.body || {};
   const name = (b.name || "").trim();
   const email = (b.email || "").trim();
   const phone = (b.phone || "").trim();
   const product_type = (b.product_type || "").trim();
-  if (!name || !email || !phone || !product_type) {
-    const e = new Error("Name, email, phone and product type are required");
+  const size = (b.size || "").trim();
+  const color = (b.color || "").trim();
+  const material = (b.material || "").trim();
+  const additional_instructions = (b.additional_instructions || "").trim();
+  // All fields required except design files + additional instructions
+  if (!name || !email || !phone || !product_type || !size || !color || !material) {
+    const e = new Error("Please fill in all required fields.");
     e.status = 400;
     throw e;
   }
+  // Upload any attached documents to Cloudinary (optional)
+  const design_files = [];
+  for (const file of req.files || []) {
+    try {
+      const buffer = await fileBuffer(file);
+      const up = await cloudinaryUploadAuto(buffer, `sojaru/customization/${uuidv4()}`);
+      design_files.push({ url: up.url, public_id: up.public_id, name: file.originalname || "attachment" });
+    } catch (e) {
+      console.error("Design file upload failed:", e.message);
+      const err = new Error("File upload failed. Please try a smaller file.");
+      err.status = 502;
+      throw err;
+    }
+  }
   const doc = {
-    name,
-    email,
-    phone,
-    product_type,
-    size: (b.size || "").trim(),
-    color: (b.color || "").trim(),
-    material: (b.material || "").trim(),
+    name, email, phone, product_type, size, color, material,
+    additional_instructions,
+    design_files,
     created_at: new Date(),
   };
   const result = await db.collection("customized_orders").insertOne(doc);
@@ -494,6 +520,8 @@ app.get("/api/admin/customized-orders", wrap(async (req, res) => {
     size: d.size || "",
     color: d.color || "",
     material: d.material || "",
+    additional_instructions: d.additional_instructions || "",
+    design_files: Array.isArray(d.design_files) ? d.design_files : [],
     created_at: d.created_at || null,
   })));
 }));
