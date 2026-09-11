@@ -1,8 +1,6 @@
-// Load .env from backend/ folder (local dev). Vercel injects env vars directly.
-require("dotenv").config({
-  path: require("path").join(__dirname, "..", "backend", ".env"),
-  override: false,
-});
+// Load .env for local dev only. On Vercel, env vars come from the dashboard.
+const envPath = require("path").join(__dirname, "..", "backend", ".env");
+require("dotenv").config({ path: envPath, override: false });
 
 const express = require("express");
 const cors = require("cors");

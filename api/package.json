@@ -1,0 +1,18 @@
+{
+  "name": "sojaru-backend",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "axios": "^1.7.0",
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.18.0",
+    "jsonwebtoken": "^9.0.0",
+    "mongodb": "^6.0.0",
+    "multer": "^2.0.0",
+    "uuid": "^11.0.0"
+  }
+}
