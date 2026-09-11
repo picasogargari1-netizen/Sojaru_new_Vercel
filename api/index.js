@@ -10,6 +10,7 @@ const bcrypt = require("bcryptjs");
 const axios = require("axios");
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
+const nodemailer = require("nodemailer");
 const { v4: uuidv4 } = require("uuid");
 
 // ─── Config ──────────────────────────────────────────────────────────────────
@@ -28,6 +29,79 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
   secure: true,
 });
+
+// ─── Email (SMTP via nodemailer) ──────────────────────────────────────────────
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_USER = process.env.SMTP_USER;
+const SMTP_PASS = process.env.SMTP_PASS;
+const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
+
+let _transporter = null;
+function getTransporter() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  if (!_transporter) {
+    _transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465, // 465 = implicit SSL; 587 = STARTTLS
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+  }
+  return _transporter;
+}
+
+const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const money = (amt, cur) => `${!cur || cur === "INR" ? "₹" : cur + " "}${amt}`;
+
+function emailShell(inner) {
+  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;">
+    <div style="font-size:22px;font-weight:bold;letter-spacing:3px;color:#1a1a1a;margin-bottom:18px;">SOJARU</div>
+    ${inner}
+    <p style="margin:24px 0 0;color:#aaa;font-size:12px;">Sojaru &bull; This email was sent from hello@sojaru.co.in</p>
+  </div>`;
+}
+
+function orderEmailHtml({ name, orderId, total, currency, items, status }) {
+  const rows = (items || []).map((li) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;">${esc(li.name)} &times; ${esc(li.quantity)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;">${money(li.total, currency)}</td></tr>`).join("");
+  return emailShell(`
+    <h2 style="margin:0 0 6px;font-size:20px;color:#1a1a1a;">Thank you for your order${name ? ", " + esc(name) : ""}! 🐾</h2>
+    <p style="margin:0 0 16px;color:#555;">We've received your order <strong>#${esc(orderId)}</strong> and it's now being processed.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">${rows}
+      <tr><td style="padding:10px;font-weight:bold;">Total</td><td style="padding:10px;text-align:right;font-weight:bold;">${money(total, currency)}</td></tr>
+    </table>
+    <p style="margin:18px 0 0;color:#555;">Order status: <strong>${esc(status || "processing")}</strong></p>
+  `);
+}
+
+function customizationEmailHtml({ name, product_type, size, color, material, additional_instructions, fileCount }) {
+  const line = (label, val) => val ? `<tr><td style="padding:5px 10px;color:#888;">${label}</td><td style="padding:5px 10px;color:#1a1a1a;">${esc(val)}</td></tr>` : "";
+  return emailShell(`
+    <h2 style="margin:0 0 6px;font-size:20px;color:#1a1a1a;">We got your customization request${name ? ", " + esc(name) : ""}! 🐾</h2>
+    <p style="margin:0 0 16px;color:#555;">Our team will review the details below and reach out to you shortly.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+      ${line("Product Type", product_type)}
+      ${line("Size", size)}
+      ${line("Color", color)}
+      ${line("Material", material)}
+      ${line("Instructions", additional_instructions)}
+      ${fileCount ? line("Attachments", fileCount + " file(s) received") : ""}
+    </table>
+  `);
+}
+
+// Awaitable + never-throws. Must be awaited before sending the HTTP response so it
+// reliably runs on Vercel serverless (functions can freeze right after the response).
+function sendMail({ to, subject, html }) {
+  const t = getTransporter();
+  if (!t || !to) { if (!t) console.warn("SMTP not configured; skipping email to", to); return Promise.resolve(); }
+  return t.sendMail({ from: `Sojaru <${SMTP_FROM}>`, to, cc: SMTP_FROM, replyTo: SMTP_FROM, subject, html })
+    .then((info) => console.log("Email sent:", info.messageId, "->", to))
+    .catch((err) => console.error("Email send failed:", err.message));
+}
 
 // ─── MongoDB (cached for serverless cold starts) ──────────────────────────────
 let _db = null;
@@ -288,6 +362,16 @@ app.post("/api/orders", wrap(async (req, res) => {
   if (user?.wc_customer_id) payload.customer_id = user.wc_customer_id;
   const r = await wc("POST", "orders", null, payload);
   const o = r.data;
+  // Send confirmation email to the customer (CC hello@sojaru.co.in) — non-blocking
+  const billingEmail = b.billing && b.billing.email ? String(b.billing.email).trim() : "";
+  const billingName = b.billing ? [b.billing.first_name, b.billing.last_name].filter(Boolean).join(" ") : "";
+  if (billingEmail) {
+    await sendMail({
+      to: billingEmail,
+      subject: `Your Sojaru order #${o.id} is confirmed 🐾`,
+      html: orderEmailHtml({ name: billingName, orderId: o.id, total: o.total, currency: o.currency, items: o.line_items, status: o.status }),
+    });
+  }
   res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, order_key: o.order_key, payment_url: `${WC_STORE_URL}/checkout/order-pay/${o.id}/?pay_for_order=true&key=${o.order_key || ""}`, line_items: o.line_items || [] });
 }));
 
@@ -503,6 +587,12 @@ app.post("/api/customized-orders", upload.array("design_files", 5), wrap(async (
     created_at: new Date(),
   };
   const result = await db.collection("customized_orders").insertOne(doc);
+  // Send confirmation email to the customer (CC hello@sojaru.co.in) — awaited for Vercel reliability
+  await sendMail({
+    to: email,
+    subject: "We received your Sojaru customization request 🐾",
+    html: customizationEmailHtml({ name, product_type, size, color, material, additional_instructions, fileCount: design_files.length }),
+  });
   res.json({ id: result.insertedId.toString(), ok: true });
 }));
 

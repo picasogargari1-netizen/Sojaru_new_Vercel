@@ -85,3 +85,10 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - New backend endpoints in api/index.js: GET /api/customizable-products (public), POST /api/customized-orders (public, multipart w/ upload.array design_files), GET /api/admin/customized-orders (admin), DELETE /api/admin/customized-orders/:id (admin). Stored in customized_orders collection.
 - Admin: new "Customized Orders" tab lists all submissions (incl. instructions + clickable Cloudinary design-file links) with per-row delete.
 - Verified: backend 20/20 + multipart upload; frontend 12/12 via testing agent.
+
+## Order Confirmation Emails (2026-07)
+- Added SMTP email via Nodemailer using the customer's Hostinger mailbox (smtp.hostinger.com:465, hello@sojaru.co.in).
+- On a NORMAL order (POST /api/orders) and a CUSTOMIZATION order (POST /api/customized-orders), a confirmation email is sent TO the customer, FROM hello@sojaru.co.in, with hello@sojaru.co.in CC'd (so the store is notified).
+- Emails are AWAITED before the HTTP response (required for Vercel serverless reliability), with connection/socket timeouts and error-swallowing so a mail failure never breaks an order.
+- Env vars (in /app/.env locally; MUST also be added in Vercel dashboard): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
+- Verified: SMTP verify OK, real test email accepted by Hostinger, customization-order endpoint triggers email (logged). Normal-order path shares the same verified sendMail helper (not live-tested to avoid creating real WooCommerce orders).
