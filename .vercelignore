@@ -1,0 +1,21 @@
+# Python backend (not used on Vercel — Node.js api/index.js is the backend)
+backend/
+scripts/
+tests/
+backend_test.py
+test_hero_text.py
+test_result.md
+test_reports/
+memory/
+
+# Old / non-Vercel deploy artifacts
+Procfile
+runtime.txt
+start.sh
+build_frontend.sh
+db.js
+t.png
+
+# Misc
+*.pyc
+__pycache__/

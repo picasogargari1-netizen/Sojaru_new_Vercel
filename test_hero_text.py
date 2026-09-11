@@ -9,7 +9,7 @@ import requests
 import random
 
 # Backend base URL from frontend/.env
-BASE_URL = "https://design-refresh-615.preview.emergentagent.com/api"
+BASE_URL = "https://vercel-ready-prod.preview.emergentagent.com/api"
 
 # Admin credentials from /app/memory/test_credentials.md
 ADMIN_EMAIL = "hello@sojaru.co.in"

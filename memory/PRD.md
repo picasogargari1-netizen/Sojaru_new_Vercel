@@ -69,3 +69,12 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Webhook-based cache invalidation on product update.
 - Wishlist persistence, product reviews submission, gift-message field passthrough.
 - Global attribute taxonomies for server-side size/color filtering (currently client-side).
+
+
+## Vercel Deployment Fix (2026-07)
+- Root cause of deployment failures: `vercel.json` used the experimental "Vercel Services" beta schema (`services` block + `{type:"service"}` rewrite destinations), which requires special dashboard setup and was fragile.
+- Rewrote `vercel.json` to the standard, zero-dashboard-config approach: `installCommand: npm install`, `buildCommand: cd frontend && yarn install --frozen-lockfile && yarn build`, `outputDirectory: frontend/build`, `functions.api/index.js.maxDuration: 30`, and ordered rewrites (`/api/(.*) -> /api`, then `/(.*) -> /index.html` SPA fallback).
+- Removed stray `mongodb` dependency from `frontend/package.json` (browser build should not include a DB driver).
+- Added `engines.node: 20.x` to root `package.json`; standardized root on npm (package-lock.json, removed stray yarn.lock).
+- Added `.vercelignore` to exclude the legacy Python backend, tests, reports, and non-Vercel artifacts from the deploy.
+- Verified: frontend `yarn build` succeeds, `--frozen-lockfile` in sync, Node API (`api/index.js`) boots and serves `/api` routes.

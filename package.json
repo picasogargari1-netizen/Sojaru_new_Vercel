@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "Sojaru API — Express.js serverless backend for Vercel",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "axios": "^1.7.0",
     "bcryptjs": "^2.4.3",

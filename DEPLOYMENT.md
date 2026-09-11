@@ -67,9 +67,13 @@ In your Vercel project → **Settings → Environment Variables**, add these:
 
 ## Step 4 — Deploy
 
-1. Click **Deploy** in Vercel
-2. Vercel runs `npm install` (installs backend deps), then `cd frontend && yarn install && yarn build`
-3. Your site goes live at `https://your-project.vercel.app`
+1. Click **Deploy** in Vercel — no framework preset selection needed, `vercel.json` fully configures the build
+2. Vercel runs `npm install` (installs the Node.js API deps), then `cd frontend && yarn install --frozen-lockfile && yarn build`
+3. `/api/*` requests are served by the Node.js serverless function (`api/index.js`); everything else serves the React SPA (`frontend/build/index.html`)
+4. Your site goes live at `https://your-project.vercel.app`
+
+> **Function timeout**: `vercel.json` sets `maxDuration: 30s` for `api/index.js` so slow WooCommerce responses don't get cut off by the default 10s limit.
+> **Uploads**: Vercel serverless functions cap request bodies at ~4.5 MB. Admin image uploads must stay under that size.
 
 ---
 
