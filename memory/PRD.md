@@ -97,3 +97,8 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Redesigned order + customization emails: table-based, inline-styled (email-client safe), with the Sojaru logo (hosted on Cloudinary: sojaru/brand/logo), brand palette (cream #FAF9F6, ink #1A1715, accent #E8DFD0, soft #F4EDE3, oat #F0E9DF), a dark footer wordmark, and a "Continue Shopping" / "Explore The Shop" button.
 - Shop-again button links to SITE_URL env var (falls back to WC_STORE_URL). Set SITE_URL to the storefront domain on Vercel for the button to point to the live shop.
 - Verified by sending real branded order + customization emails to hello@sojaru.co.in.
+
+## Worlds Section — For You / For Your Pet (2026-07)
+- Added a 2-part "Worlds" section on the homepage below the "Durga Pujor Collections" (Festive) card.
+- Two cards: "For You" (routes to /shop/for-you) and "For Your Pet" (routes to /shop/for-your-pet), each with distinct imagery and a "Shop Now" button.
+- FINALIZED and approved by user (2026-07). No further changes requested.
