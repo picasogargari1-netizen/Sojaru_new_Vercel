@@ -5,7 +5,9 @@
       "framework": "create-react-app"
     },
     "backend": {
-      "root": "api"
+      "root": "api",
+      "framework": "express",
+      "entrypoint": "index.js"
     }
   },
   "rewrites": [
