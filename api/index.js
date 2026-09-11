@@ -57,32 +57,69 @@ function getTransporter() {
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const money = (amt, cur) => `${!cur || cur === "INR" ? "₹" : cur + " "}${amt}`;
 
-function emailShell(inner) {
-  return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#fff;border:1px solid #eee;">
-    <div style="font-size:22px;font-weight:bold;letter-spacing:3px;color:#1a1a1a;margin-bottom:18px;">SOJARU</div>
-    ${inner}
-    <p style="margin:24px 0 0;color:#aaa;font-size:12px;">Sojaru &bull; This email was sent from hello@sojaru.co.in</p>
-  </div>`;
+// Brand assets
+const LOGO_URL = "https://res.cloudinary.com/gmek0njq/image/upload/v1789165310/sojaru/brand/logo.png";
+const SITE_URL = (process.env.SITE_URL || WC_STORE_URL || "").replace(/\/$/, "");
+const BRAND = { cream: "#FAF9F6", ink: "#1A1715", accent: "#E8DFD0", soft: "#F4EDE3", oat: "#F0E9DF" };
+
+function shopButton(label) {
+  if (!SITE_URL) return "";
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px auto 4px;"><tr><td style="border-radius:0;background:${BRAND.ink};">
+    <a href="${SITE_URL}" style="display:inline-block;padding:15px 40px;color:${BRAND.cream};text-decoration:none;font-size:12px;font-weight:bold;letter-spacing:2px;text-transform:uppercase;font-family:Arial,Helvetica,sans-serif;">${esc(label || "Continue Shopping")}</a>
+  </td></tr></table>`;
+}
+
+// Branded, email-client-friendly (table-based, inline styles) shell
+function emailShell(inner, buttonLabel) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+  <body style="margin:0;padding:0;background:${BRAND.oat};">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${BRAND.oat};padding:28px 12px;">
+      <tr><td align="center">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:${BRAND.cream};border:1px solid ${BRAND.accent};">
+          <tr><td align="center" style="background:${BRAND.soft};padding:26px 24px;border-bottom:1px solid ${BRAND.accent};">
+            <img src="${LOGO_URL}" alt="Sojaru" height="42" style="height:42px;width:auto;display:block;border:0;" />
+          </td></tr>
+          <tr><td style="padding:34px 36px;font-family:Arial,Helvetica,sans-serif;color:${BRAND.ink};">
+            ${inner}
+            <div align="center">${shopButton(buttonLabel)}</div>
+          </td></tr>
+          <tr><td style="background:${BRAND.ink};padding:22px 36px;font-family:Arial,Helvetica,sans-serif;">
+            <p style="margin:0 0 4px;color:${BRAND.cream};font-size:14px;font-weight:bold;letter-spacing:3px;">SOJARU</p>
+            <p style="margin:0;color:#b9b2aa;font-size:11px;line-height:1.6;">A little imperfect, a little expressive, full of heart.<br/>This email was sent from hello@sojaru.co.in — just reply if you need anything. 🐾</p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body></html>`;
 }
 
 function orderEmailHtml({ name, orderId, total, currency, items, status }) {
-  const rows = (items || []).map((li) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;">${esc(li.name)} &times; ${esc(li.quantity)}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;">${money(li.total, currency)}</td></tr>`).join("");
+  const rows = (items || []).map((li) => `<tr>
+      <td style="padding:10px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(li.name)} <span style="color:#999;">&times; ${esc(li.quantity)}</span></td>
+      <td style="padding:10px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};text-align:right;white-space:nowrap;">${money(li.total, currency)}</td>
+    </tr>`).join("");
   return emailShell(`
-    <h2 style="margin:0 0 6px;font-size:20px;color:#1a1a1a;">Thank you for your order${name ? ", " + esc(name) : ""}! 🐾</h2>
-    <p style="margin:0 0 16px;color:#555;">We've received your order <strong>#${esc(orderId)}</strong> and it's now being processed.</p>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;">${rows}
-      <tr><td style="padding:10px;font-weight:bold;">Total</td><td style="padding:10px;text-align:right;font-weight:bold;">${money(total, currency)}</td></tr>
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:${BRAND.ink};">Thank you for your order${name ? ", " + esc(name) : ""}! 🐾</h1>
+    <p style="margin:0 0 22px;color:#6b6560;font-size:14px;line-height:1.6;">We've received order <strong style="color:${BRAND.ink};">#${esc(orderId)}</strong> and it's now being processed. Here's a summary:</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}
+      <tr>
+        <td style="padding:14px 4px 0;font-size:15px;font-weight:bold;color:${BRAND.ink};">Total</td>
+        <td style="padding:14px 4px 0;font-size:15px;font-weight:bold;color:${BRAND.ink};text-align:right;">${money(total, currency)}</td>
+      </tr>
     </table>
-    <p style="margin:18px 0 0;color:#555;">Order status: <strong>${esc(status || "processing")}</strong></p>
-  `);
+    <p style="margin:18px 0 0;color:#6b6560;font-size:13px;">Order status: <strong style="color:${BRAND.ink};text-transform:capitalize;">${esc(status || "processing")}</strong></p>
+  `, "Continue Shopping");
 }
 
 function customizationEmailHtml({ name, product_type, size, color, material, additional_instructions, fileCount }) {
-  const line = (label, val) => val ? `<tr><td style="padding:5px 10px;color:#888;">${label}</td><td style="padding:5px 10px;color:#1a1a1a;">${esc(val)}</td></tr>` : "";
+  const line = (label, val) => val ? `<tr>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:12px;color:#8a837c;text-transform:uppercase;letter-spacing:1px;width:150px;vertical-align:top;">${label}</td>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(val)}</td>
+    </tr>` : "";
   return emailShell(`
-    <h2 style="margin:0 0 6px;font-size:20px;color:#1a1a1a;">We got your customization request${name ? ", " + esc(name) : ""}! 🐾</h2>
-    <p style="margin:0 0 16px;color:#555;">Our team will review the details below and reach out to you shortly.</p>
-    <table style="width:100%;border-collapse:collapse;font-size:14px;">
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:${BRAND.ink};">We got your customization request${name ? ", " + esc(name) : ""}! 🐾</h1>
+    <p style="margin:0 0 22px;color:#6b6560;font-size:14px;line-height:1.6;">Our team will review the details below and reach out to you shortly.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
       ${line("Product Type", product_type)}
       ${line("Size", size)}
       ${line("Color", color)}
@@ -90,7 +127,7 @@ function customizationEmailHtml({ name, product_type, size, color, material, add
       ${line("Instructions", additional_instructions)}
       ${fileCount ? line("Attachments", fileCount + " file(s) received") : ""}
     </table>
-  `);
+  `, "Explore The Shop");
 }
 
 // Awaitable + never-throws. Must be awaited before sending the HTTP response so it

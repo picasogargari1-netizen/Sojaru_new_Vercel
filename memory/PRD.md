@@ -92,3 +92,8 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Emails are AWAITED before the HTTP response (required for Vercel serverless reliability), with connection/socket timeouts and error-swallowing so a mail failure never breaks an order.
 - Env vars (in /app/.env locally; MUST also be added in Vercel dashboard): SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM.
 - Verified: SMTP verify OK, real test email accepted by Hostinger, customization-order endpoint triggers email (logged). Normal-order path shares the same verified sendMail helper (not live-tested to avoid creating real WooCommerce orders).
+
+## Branded Email Templates (2026-07)
+- Redesigned order + customization emails: table-based, inline-styled (email-client safe), with the Sojaru logo (hosted on Cloudinary: sojaru/brand/logo), brand palette (cream #FAF9F6, ink #1A1715, accent #E8DFD0, soft #F4EDE3, oat #F0E9DF), a dark footer wordmark, and a "Continue Shopping" / "Explore The Shop" button.
+- Shop-again button links to SITE_URL env var (falls back to WC_STORE_URL). Set SITE_URL to the storefront domain on Vercel for the button to point to the live shop.
+- Verified by sending real branded order + customization emails to hello@sojaru.co.in.
