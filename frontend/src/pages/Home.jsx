@@ -286,6 +286,50 @@ function FestiveSection() {
   );
 }
 
+// ─── 3a. WORLDS (For You / For Your Pet) — two-part card below Festive ─────────
+function WorldsSection() {
+  const { forYou, forPet } = useStore();
+  const cards = [
+    {
+      title: "For You",
+      subtitle: "Clothing, accessories & more, picked just for you",
+      img: "/for-you.jpg",
+      to: forYou ? `/shop/${forYou.slug}` : "/shop/for-you",
+      testid: "world-for-you",
+    },
+    {
+      title: "For Your Pet",
+      subtitle: "Treats, toys & goods for your best friend",
+      img: "/for-your-pet.jpg",
+      to: forPet ? `/shop/${forPet.slug}` : "/shop/for-your-pet",
+      testid: "world-for-pet",
+    },
+  ];
+  return (
+    <section className="bg-cream py-14 sm:py-18" data-testid="worlds-section">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          {cards.map((c) => (
+            <div key={c.title} data-testid={c.testid} className="group relative overflow-hidden border-2 border-ink">
+              <div className="aspect-[4/3] w-full overflow-hidden">
+                <img src={c.img} alt={c.title} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-ink/75 via-ink/25 to-transparent" />
+              <div className="absolute inset-0 flex flex-col items-center justify-end p-8 text-center">
+                <h3 className="font-display text-3xl italic text-cream drop-shadow-md sm:text-4xl">{c.title}</h3>
+                <p className="mt-2 max-w-xs text-sm text-cream/85 drop-shadow">{c.subtitle}</p>
+                <Link to={c.to} data-testid={`${c.testid}-shop`} className="mt-5 inline-block rounded-none bg-cream px-8 py-3 text-xs font-bold uppercase tracking-widest text-ink transition-colors hover:bg-yellow">
+                  Shop Now
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── 3b. WARM ITALIC MARQUEE (after hero, like hyppy.in) ──────────────────────
 function WarmMarquee() {
   return (
@@ -503,6 +547,7 @@ export default function Home() {
       <CustomizeSection />
 
       <FestiveSection />
+      <WorldsSection />
       <CategoryRow />
       <ProductSection
         slug="featured"
