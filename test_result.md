@@ -269,6 +269,21 @@ test_plan:
 agent_communication:
     -agent: "main"
     -message: |
+      ENV SETUP (2026-09-12): User provided production env vars; configured the full stack.
+      (1) Created /app/.env (loaded by Node.js backend /app/api/index.js): MONGO_URL (MongoDB Atlas
+      cluster0), DB_NAME=Sojaru, WC_STORE_URL/WC_CONSUMER_KEY/WC_CONSUMER_SECRET (developer.sojaru.co.in),
+      JWT_SECRET, ADMIN_EMAIL/ADMIN_PASSWORD, CORS_ORIGINS=*, PORT=8001, EMERGENT_LLM_KEY,
+      CLOUDINARY_* (gmek0njq), SMTP_* (Hostinger smtp.hostinger.com:465), RAZORPAY_* (live keys).
+      (2) Created /app/frontend/.env with REACT_APP_BACKEND_URL EMPTY (same-domain /api via ingress ->
+      port 8001); user's placeholder "your-hostinger-backend-domain.com" was NOT used as it would break
+      the preview - production value documented in the file comments.
+      (3) Fixed supervisor [program:backend]: was pointing to deleted FastAPI /app/backend (ENOENT crash
+      loop); now runs `node /app/api/index.js` from /app. (4) yarn install at /app (backend deps).
+      VERIFIED: GET /api/settings 200 (Atlas OK), GET /api/categories 200 (WooCommerce OK),
+      POST /api/auth/login admin 200 (JWT OK), frontend preview 200, preview /api/settings 200,
+      homepage screenshot renders hero + marquee. Admin creds in /app/memory/test_credentials.md.
+    -agent: "main"
+    -message: |
       UPDATED customization feature. Please TEST FRONTEND (preview URL) end-to-end:
       HOMEPAGE (scroll to the fullscreen video section, data-testid="customize-section"):
       - A fullscreen background <video data-testid="customize-video"> plays.
@@ -307,7 +322,7 @@ agent_communication:
     -message: |
       ✅ CUSTOMIZATION FEATURE BACKEND TESTING COMPLETE - ALL 20 TESTS PASSED (100% SUCCESS RATE)
       
-      Tested all 4 new Node.js backend endpoints for the customization feature at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/api
+      Tested all 4 new Node.js backend endpoints for the customization feature at https://store-preview-81.preview.emergentagent.com/api
       
       ENDPOINT 1 - GET /api/customizable-products (PUBLIC): ✅ WORKING (4/4 tests passed)
       - Returns HTTP 200 with JSON array
@@ -348,7 +363,7 @@ agent_communication:
     -message: |
       ✅ HOMEPAGE CUSTOMIZATION FORM & ADMIN ORDERS TESTING COMPLETE - ALL 12 TESTS PASSED (100% SUCCESS RATE)
       
-      Tested the new homepage customization section and admin Customized Orders flow end-to-end at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com
+      Tested the new homepage customization section and admin Customized Orders flow end-to-end at https://store-preview-81.preview.emergentagent.com
       
       PART A - HOMEPAGE CUSTOMIZATION SECTION (7/7 passed):
       1. ✅ Customize section visibility: Fullscreen video section (data-testid="customize-section") scrolls into view correctly below hero and product rows.
@@ -631,13 +646,13 @@ agent_communication:
     status_history:
         - working: false
           agent: "user"
-          comment: "User reported that banner (hero) images and WooCommerce products were not showing on the homepage at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/"
+          comment: "User reported that banner (hero) images and WooCommerce products were not showing on the homepage at https://store-preview-81.preview.emergentagent.com/"
         - working: true
           agent: "main"
           comment: "Fixed backend env config. The issue was likely due to missing or incorrect environment variables in backend/.env that prevented proper data loading from MongoDB (hero images) and WooCommerce (products)."
         - working: true
           agent: "testing"
-          comment: "✅ USER-REPORTED ISSUE VERIFIED AS FIXED - ALL CRITICAL ELEMENTS NOW WORKING. Tested homepage at https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/ with 8-second wait for API data loading. HERO BANNER IMAGE: ✅ WORKING - Hero section (data-testid='hero-section') contains 1 hero image (NOT the dark fallback div). Image src: https://res.cloudinary.com/gmek0njq/image/upload/v1788979800/sojaru/hero/a507fc65-480e-40eb-9089-97d3541257b3.jpg (Cloudinary URL confirmed). Image displays correctly with opacity-100 class. WOOCOMMERCE PRODUCTS: ✅ WORKING - 27 product cards rendering on homepage with correct data from WooCommerce API. Products display: titles (e.g., 'Floral Print Dog T-Shirt', 'Chai Ritual Gift Hamper', 'Soy Candle Gift Set — 3 Scents'), prices (₹349, ₹999, ₹899), categories (FESTIVE COLLECTIONS, BEST SELLERS, DECORS), sale badges, and NEW badges. Product images showing placeholders (placehold.co) because WooCommerce products have empty images arrays in API response - this is expected fallback behavior, not a bug. CATEGORY IMAGES: ✅ WORKING - Category bento grid (data-testid='category-bento-grid') displays 10 category tiles with Cloudinary images. First category tile image: https://res.cloudinary.com/gmek0njq/image/upload/v1788979841/sojaru/categories/... API HEALTH: ✅ ALL APIS SUCCESSFUL - /api/products (200), /api/categories (200), /api/settings (200). Zero console errors. Zero network errors. FESTIVE SECTION: ✅ VISIBLE - 'Durga Pujo Collections' section rendering with 3 product cards. CONCLUSION: Both user-reported issues are FIXED. Hero banner image displays correctly (Cloudinary URL). WooCommerce products display correctly (27 cards with names, prices, categories from WooCommerce API). Product placeholder images are expected behavior when WooCommerce products lack image data."
+          comment: "✅ USER-REPORTED ISSUE VERIFIED AS FIXED - ALL CRITICAL ELEMENTS NOW WORKING. Tested homepage at https://store-preview-81.preview.emergentagent.com/ with 8-second wait for API data loading. HERO BANNER IMAGE: ✅ WORKING - Hero section (data-testid='hero-section') contains 1 hero image (NOT the dark fallback div). Image src: https://res.cloudinary.com/gmek0njq/image/upload/v1788979800/sojaru/hero/a507fc65-480e-40eb-9089-97d3541257b3.jpg (Cloudinary URL confirmed). Image displays correctly with opacity-100 class. WOOCOMMERCE PRODUCTS: ✅ WORKING - 27 product cards rendering on homepage with correct data from WooCommerce API. Products display: titles (e.g., 'Floral Print Dog T-Shirt', 'Chai Ritual Gift Hamper', 'Soy Candle Gift Set — 3 Scents'), prices (₹349, ₹999, ₹899), categories (FESTIVE COLLECTIONS, BEST SELLERS, DECORS), sale badges, and NEW badges. Product images showing placeholders (placehold.co) because WooCommerce products have empty images arrays in API response - this is expected fallback behavior, not a bug. CATEGORY IMAGES: ✅ WORKING - Category bento grid (data-testid='category-bento-grid') displays 10 category tiles with Cloudinary images. First category tile image: https://res.cloudinary.com/gmek0njq/image/upload/v1788979841/sojaru/categories/... API HEALTH: ✅ ALL APIS SUCCESSFUL - /api/products (200), /api/categories (200), /api/settings (200). Zero console errors. Zero network errors. FESTIVE SECTION: ✅ VISIBLE - 'Durga Pujo Collections' section rendering with 3 product cards. CONCLUSION: Both user-reported issues are FIXED. Hero banner image displays correctly (Cloudinary URL). WooCommerce products display correctly (27 cards with names, prices, categories from WooCommerce API). Product placeholder images are expected behavior when WooCommerce products lack image data."
 
 ## frontend:
   - task: "Hyppy.in theme redesign - fonts, colors, layout structure"

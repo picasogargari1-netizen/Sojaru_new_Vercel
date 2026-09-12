@@ -11,7 +11,7 @@ import sys
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://9567a06f-32da-46f7-be8c-cff46b6f2edf.preview.emergentagent.com/api"
+BASE_URL = "https://store-preview-81.preview.emergentagent.com/api"
 ADMIN_EMAIL = "hello@sojaru.co.in"
 ADMIN_PASSWORD = "admin123"
 
