@@ -102,3 +102,11 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Added a 2-part "Worlds" section on the homepage below the "Durga Pujor Collections" (Festive) card.
 - Two cards: "For You" (routes to /shop/for-you) and "For Your Pet" (routes to /shop/for-your-pet), each with distinct imagery and a "Shop Now" button.
 - FINALIZED and approved by user (2026-07). No further changes requested.
+
+## Razorpay Payment Integration (2026-06)
+- Replaced the WooCommerce hosted "order-pay" checkout with a native Razorpay Checkout popup on the checkout page.
+- Flow: checkout form → POST /api/orders creates an UNPAID WooCommerce order + a Razorpay order (amount = WC total in paise, INR) → frontend opens Razorpay popup (checkout.js loaded dynamically) → on success POST /api/payments/verify does HMAC-SHA256 signature verification (order_id|payment_id with RAZORPAY_KEY_SECRET) → marks the WC order set_paid=true, status=processing, transaction_id=razorpay_payment_id → sends branded confirmation email → shows confirmation screen.
+- Order confirmation email now fires AFTER successful payment (moved out of order creation), so only paid orders get the email.
+- Backend: `razorpay` npm pkg, getRazorpay() lazy client, endpoints POST /api/orders (returns razorpay_order_id/key_id/amount) and POST /api/payments/verify. Frontend: orders.verifyPayment() in api.js, loadRazorpayScript() + rzp.open() in CheckoutPage.jsx. Removed the old WooCommerce "Complete Payment" fallback button.
+- Env vars: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (in /app/.env locally; MUST also be added in Vercel dashboard for prod). Currently using LIVE keys (rzp_live_).
+- Verified: Razorpay order creation works against live account (no charge); signature verify passes for valid sig and rejects invalid; WC order flips to paid/processing; confirmation email sent; checkout UI renders "Pay securely" / "Secured by Razorpay". NOTE: full popup-to-card payment NOT live-tested (live keys = real charge).

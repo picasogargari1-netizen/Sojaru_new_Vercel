@@ -54,6 +54,18 @@ function getTransporter() {
   return _transporter;
 }
 
+// ─── Razorpay ─────────────────────────────────────────────────────────────────
+const Razorpay = require("razorpay");
+const crypto = require("crypto");
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID;
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+let _razorpay = null;
+function getRazorpay() {
+  if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) return null;
+  if (!_razorpay) _razorpay = new Razorpay({ key_id: RAZORPAY_KEY_ID, key_secret: RAZORPAY_KEY_SECRET });
+  return _razorpay;
+}
+
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const money = (amt, cur) => `${!cur || cur === "INR" ? "₹" : cur + " "}${amt}`;
 
@@ -391,17 +403,60 @@ app.get("/api/coupons/validate", wrap(async (req, res) => {
   const c = r.data[0]; res.json({ code: c.code, discount_type: c.discount_type, amount: c.amount, description: c.description || "" });
 }));
 
-// Create order
+// Create order (creates unpaid WooCommerce order + a Razorpay order to collect payment)
 app.post("/api/orders", wrap(async (req, res) => {
   let user = null; try { user = await getCurrentUser(req); } catch {}
   const b = req.body;
-  const payload = { payment_method: b.payment_method || "cod", payment_method_title: b.payment_method_title || "Cash on Delivery", set_paid: false, billing: b.billing, shipping: b.shipping || b.billing, line_items: b.line_items, coupon_lines: b.coupon_lines || [], shipping_lines: b.shipping_lines || [], customer_note: b.customer_note || "" };
+  const payload = { payment_method: "razorpay", payment_method_title: "Razorpay", set_paid: false, billing: b.billing, shipping: b.shipping || b.billing, line_items: b.line_items, coupon_lines: b.coupon_lines || [], shipping_lines: b.shipping_lines || [], customer_note: b.customer_note || "" };
   if (user?.wc_customer_id) payload.customer_id = user.wc_customer_id;
   const r = await wc("POST", "orders", null, payload);
   const o = r.data;
-  // Send confirmation email to the customer (CC hello@sojaru.co.in) — non-blocking
-  const billingEmail = b.billing && b.billing.email ? String(b.billing.email).trim() : "";
-  const billingName = b.billing ? [b.billing.first_name, b.billing.last_name].filter(Boolean).join(" ") : "";
+
+  // Create a Razorpay order for the WooCommerce order total (authoritative amount)
+  const rzp = getRazorpay();
+  let razorpay_order_id = null, razorpay_amount = null;
+  if (rzp) {
+    const amountPaise = Math.round(Number(o.total) * 100);
+    const rzpOrder = await rzp.orders.create({
+      amount: amountPaise,
+      currency: o.currency || "INR",
+      receipt: `wc_${o.id}`,
+      notes: { wc_order_id: String(o.id), customer_email: (b.billing && b.billing.email) || "" },
+    });
+    razorpay_order_id = rzpOrder.id;
+    razorpay_amount = rzpOrder.amount;
+  }
+
+  res.json({
+    id: o.id, status: o.status, total: o.total, currency: o.currency, order_key: o.order_key,
+    line_items: o.line_items || [],
+    razorpay_order_id, razorpay_key_id: RAZORPAY_KEY_ID || null, razorpay_amount,
+  });
+}));
+
+// Verify a Razorpay payment and mark the WooCommerce order as paid
+app.post("/api/payments/verify", wrap(async (req, res) => {
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature, wc_order_id } = req.body || {};
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !wc_order_id) {
+    const e = new Error("Missing payment verification fields"); e.status = 400; throw e;
+  }
+  if (!RAZORPAY_KEY_SECRET) { const e = new Error("Payment gateway not configured"); e.status = 500; throw e; }
+
+  const expected = crypto.createHmac("sha256", RAZORPAY_KEY_SECRET)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex");
+  if (expected !== razorpay_signature) {
+    const e = new Error("Payment verification failed"); e.status = 400; throw e;
+  }
+
+  // Mark the WooCommerce order paid
+  const upd = await wc("PUT", `orders/${wc_order_id}`, null, {
+    set_paid: true, status: "processing", transaction_id: razorpay_payment_id,
+  });
+  const o = upd.data;
+
+  // Send branded confirmation email now that payment succeeded — awaited for serverless reliability
+  const billingEmail = o.billing && o.billing.email ? String(o.billing.email).trim() : "";
+  const billingName = o.billing ? [o.billing.first_name, o.billing.last_name].filter(Boolean).join(" ") : "";
   if (billingEmail) {
     await sendMail({
       to: billingEmail,
@@ -409,7 +464,8 @@ app.post("/api/orders", wrap(async (req, res) => {
       html: orderEmailHtml({ name: billingName, orderId: o.id, total: o.total, currency: o.currency, items: o.line_items, status: o.status }),
     });
   }
-  res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, order_key: o.order_key, payment_url: `${WC_STORE_URL}/checkout/order-pay/${o.id}/?pay_for_order=true&key=${o.order_key || ""}`, line_items: o.line_items || [] });
+
+  res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, paid: true });
 }));
 
 // Get order

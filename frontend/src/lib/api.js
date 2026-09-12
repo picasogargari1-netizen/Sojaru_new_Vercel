@@ -82,6 +82,7 @@ export const products = {
 
 export const orders = {
   create: (payload) => client.post("/orders", payload).then((r) => r.data),
+  verifyPayment: (payload) => client.post("/payments/verify", payload).then((r) => r.data),
   createCustomized: (payload) => client.post("/customized-orders", payload).then((r) => r.data),
   validateCoupon: (code) => client.get("/coupons/validate", { params: { code } }).then((r) => r.data),
 };

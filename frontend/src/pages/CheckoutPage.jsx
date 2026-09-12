@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Lock, Tag, CheckCircle2, ArrowRight, Loader2, ShoppingBag } from "lucide-react";
+import { Lock, Tag, CheckCircle2, Loader2, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import { orders as ordersApi, apiErr } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
@@ -18,6 +18,18 @@ const COUNTRIES = [
   { code: "AU", name: "Australia" }, { code: "SG", name: "Singapore" },
   { code: "AE", name: "United Arab Emirates" },
 ];
+
+// Load Razorpay Checkout script once
+function loadRazorpayScript() {
+  return new Promise((resolve) => {
+    if (window.Razorpay) return resolve(true);
+    const s = document.createElement("script");
+    s.src = "https://checkout.razorpay.com/v1/checkout.js";
+    s.onload = () => resolve(true);
+    s.onerror = () => resolve(false);
+    document.body.appendChild(s);
+  });
+}
 
 export default function CheckoutPage() {
   usePageMeta({ title: "Checkout — Sojaru" });
@@ -82,14 +94,65 @@ export default function CheckoutPage() {
         shipping_lines: [shipping > 0
           ? { method_id: "flat_rate", method_title: "Flat rate", total: String(shipping) }
           : { method_id: "free_shipping", method_title: "Free shipping", total: "0" }],
-        payment_method: "sojaru_gateway", payment_method_title: "Secure Payment (WooCommerce)",
       });
-      clear();
-      setConfirmed(order);
-      window.scrollTo({ top: 0 });
+
+      if (!order.razorpay_order_id || !order.razorpay_key_id) {
+        toast.error("Payment gateway is not available right now. Please try again later.");
+        setPlacing(false);
+        return;
+      }
+
+      const ok = await loadRazorpayScript();
+      if (!ok) {
+        toast.error("Could not load the payment gateway. Check your connection and retry.");
+        setPlacing(false);
+        return;
+      }
+
+      const rzp = new window.Razorpay({
+        key: order.razorpay_key_id,
+        amount: order.razorpay_amount,
+        currency: order.currency || "INR",
+        name: "Sojaru",
+        description: `Order #${order.id}`,
+        order_id: order.razorpay_order_id,
+        prefill: {
+          name: `${form.first_name} ${form.last_name}`.trim(),
+          email: form.email,
+          contact: form.phone,
+        },
+        theme: { color: "#1A1715" },
+        handler: async (resp) => {
+          try {
+            const verified = await ordersApi.verifyPayment({
+              razorpay_order_id: resp.razorpay_order_id,
+              razorpay_payment_id: resp.razorpay_payment_id,
+              razorpay_signature: resp.razorpay_signature,
+              wc_order_id: order.id,
+            });
+            clear();
+            setConfirmed(verified);
+            window.scrollTo({ top: 0 });
+          } catch (err) {
+            toast.error(apiErr(err, "We received your payment but couldn't confirm it. Please contact support."));
+          } finally { setPlacing(false); }
+        },
+        modal: {
+          ondismiss: () => {
+            setPlacing(false);
+            toast("Payment cancelled", { description: "Your order is saved but not yet paid." });
+          },
+        },
+      });
+      rzp.on("payment.failed", (r) => {
+        setPlacing(false);
+        toast.error(r?.error?.description || "Payment failed. Please try again.");
+      });
+      rzp.open();
     } catch (err) {
       toast.error(apiErr(err, "We couldn't place your order. Please try again."));
-    } finally { setPlacing(false); }
+      setPlacing(false);
+    }
   };
 
   if (confirmed) {
@@ -100,15 +163,12 @@ export default function CheckoutPage() {
         <p className="mt-3 text-muted-foreground">Your Sojaru order <span className="font-mono font-semibold text-ink">#{confirmed.id}</span> has been received. You and your best friend are going to love it.</p>
         <div className="mt-6 bg-oat/60 p-6 text-left">
           <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Order total</span><span className="font-mono text-lg font-semibold text-ink">{money(confirmed.total)}</span></div>
-          <p className="mt-1 text-xs text-muted-foreground">Status: {confirmed.status}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Payment status: Paid · {confirmed.status}</p>
         </div>
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-          <Button asChild className="h-12 bg-ink px-7 text-cream hover:bg-terracotta">
-            <a href={confirmed.payment_url} target="_blank" rel="noopener noreferrer" data-testid="complete-payment-button">Complete Payment Securely <ArrowRight className="ml-2 h-4 w-4" /></a>
-          </Button>
           <Button asChild variant="outline" className="h-12 border border-ink px-7"><Link to="/">Continue shopping</Link></Button>
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">Payment is processed securely by your WooCommerce store's configured gateways.</p>
+        <p className="mt-4 text-xs text-muted-foreground">Your payment was processed securely by Razorpay. A confirmation email is on its way.</p>
       </div>
     );
   }
@@ -196,9 +256,9 @@ export default function CheckoutPage() {
             </div>
 
             <Button type="submit" disabled={placing} className="mt-5 h-12 w-full bg-ink text-base font-semibold text-cream transition-all hover:bg-terracotta" data-testid="place-order-button">
-              {placing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing order...</> : <><Lock className="mr-2 h-4 w-4" /> Place order</>}
+              {placing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</> : <><Lock className="mr-2 h-4 w-4" /> Pay securely</>}
             </Button>
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Secured by your WooCommerce store</p>
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Secured by Razorpay</p>
           </div>
         </div>
       </form>
