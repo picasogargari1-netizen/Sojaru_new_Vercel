@@ -245,7 +245,7 @@ function CustomizeSection() {
             </Button>
             <p className="mt-4 text-center text-xs leading-relaxed text-cream/80" data-testid="cf-contact-note">
               Have a question? We'd love to hear from you. Reach out to us at{" "}
-              <a href="tel:+919477909496" className="font-semibold text-cream underline underline-offset-2 hover:text-yellow">+91 94779 09496</a>
+              <a href="tel:+919477909496" className="whitespace-nowrap font-semibold text-cream underline underline-offset-2 hover:text-yellow">+91 94779 09496</a>
             </p>
           </form>
       </div>
