@@ -92,7 +92,6 @@ export function Footer() {
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 text-xs text-ink/40 sm:flex-row">
           <p>© {new Date().getFullYear()} Sojaru. Made for you & your best friend.</p>
-          <p>Powered by a headless WooCommerce store.</p>
         </div>
       </div>
     </footer>
