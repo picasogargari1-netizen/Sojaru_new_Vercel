@@ -616,7 +616,7 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="hero" className="mt-8">
-        <TabsList className="mb-8 flex flex-wrap gap-2 bg-transparent p-0">
+        <TabsList className="mb-8 flex h-auto flex-wrap gap-2 bg-transparent p-0">
           <TabsTrigger value="hero" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-hero"><ImageIcon className="mr-2 h-4 w-4" /> Hero Banner</TabsTrigger>
           <TabsTrigger value="herotext" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-herotext"><LayoutTemplate className="mr-2 h-4 w-4" /> Hero Text</TabsTrigger>
           <TabsTrigger value="marquee" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-marquee"><Type className="mr-2 h-4 w-4" /> Moving Text</TabsTrigger>
