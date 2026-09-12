@@ -14,16 +14,23 @@ export function StoreProvider({ children }) {
   const [loaded, setLoaded] = useState(false);
 
   const reloadSettings = () => store.settings().then(setSettings).catch(() => {});
+  const reloadCategories = () => store.categories().then((c) => setCategories(c)).catch(() => {});
 
   useEffect(() => {
     // Always use INR for this Indian storefront; ignore WooCommerce currency setting
     setSymbol("₹");
     setCode("INR");
     reloadSettings();
-    store.categories()
-      .then((c) => setCategories(c))
-      .catch(() => {})
-      .finally(() => setLoaded(true));
+    reloadCategories().finally(() => setLoaded(true));
+    // Refetch categories when the tab regains focus so WooCommerce admin edits
+    // (renames, new sub-categories/sections) appear without a hard refresh
+    const onFocus = () => { if (document.visibilityState === "visible") reloadCategories(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, []);
 
   const money = (val) => {

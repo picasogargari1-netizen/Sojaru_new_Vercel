@@ -378,11 +378,13 @@ app.get("/api/store/config", wrap(async (req, res) => {
 
 // Categories
 app.get("/api/categories", wrap(async (req, res) => {
+  res.set("Cache-Control", "no-store"); // never let browsers/CDNs serve stale category data
   const cached = cacheGet("categories");
   if (cached) return res.json(cached);
   const r = await wc("GET", "products/categories", { per_page: 100, orderby: "name", hide_empty: false });
   const cats = r.data.filter((c) => c.slug !== "uncategorized").map((c) => ({ id: c.id, name: c.name, slug: c.slug, parent: c.parent, count: c.count || 0, description: c.description || "", image: c.image?.src || null }));
-  cacheSet("categories", cats, 300); res.json(cats);
+  // Short 60s TTL: category renames/additions in wp-admin propagate within a minute
+  cacheSet("categories", cats, 60); res.json(cats);
 }));
 
 // Products list
