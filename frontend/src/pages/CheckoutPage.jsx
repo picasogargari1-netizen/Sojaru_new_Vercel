@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Lock, Tag, CheckCircle2, Loader2, ShoppingBag } from "lucide-react";
+import { Lock, Tag, CheckCircle2, Loader2, ShoppingBag, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { orders as ordersApi, apiErr } from "@/lib/api";
 import { useCart } from "@/context/CartContext";
@@ -259,6 +259,7 @@ export default function CheckoutPage() {
               {placing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</> : <><Lock className="mr-2 h-4 w-4" /> Pay securely</>}
             </Button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Secured by Razorpay</p>
+            <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground" data-testid="payment-methods-note"><CreditCard className="h-3 w-3" /> Pay via UPI, cards &amp; wallets</p>
           </div>
         </div>
       </form>
