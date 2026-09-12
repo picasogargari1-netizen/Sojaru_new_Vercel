@@ -121,7 +121,6 @@ export function Header() {
             </div>
             <Link to="/category/new-arrivals" className={navLink} data-testid="nav-new-arrivals">New Arrivals</Link>
             <Link to="/category/gifting" className={navLink} data-testid="nav-gifting">Gifting</Link>
-            <Link to="/about" className={navLink} data-testid="nav-about">About Us</Link>
             <Link to="/contact" className={navLink} data-testid="nav-contact">Contact</Link>
           </nav>
 
@@ -191,7 +190,6 @@ function MobileNav({ forYou, forPet, forYouSubs, forPetSubs, close }) {
       {forPet && <MobileNavGroup world={forPet} subs={forPetSubs} id="pet" section={section} setSection={setSection} go={go} />}
       <button onClick={() => go("/category/new-arrivals")} className="block w-full border-b border-border px-5 py-4 text-left text-sm font-medium text-ink">New Arrivals</button>
       <button onClick={() => go("/category/gifting")} className="block w-full border-b border-border px-5 py-4 text-left text-sm font-medium text-ink">Gifting</button>
-      <button onClick={() => go("/about")} className="block w-full border-b border-border px-5 py-4 text-left text-sm font-medium text-ink">About Us</button>
       <button onClick={() => go("/contact")} className="block w-full border-b border-border px-5 py-4 text-left text-sm font-medium text-ink">Contact</button>
     </div>
   );

@@ -522,13 +522,6 @@ function OurStory() {
                 made with love. built with belief.
               </p>
             </div>
-            <Link
-              to="/about"
-              data-testid="editorial-about-btn"
-              className="mt-8 inline-flex items-center gap-2 border border-ink px-6 py-2.5 text-xs font-medium uppercase tracking-widest text-ink transition-all hover:bg-ink hover:text-cream"
-            >
-              Read our story <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
           </div>
         </div>
       </div>

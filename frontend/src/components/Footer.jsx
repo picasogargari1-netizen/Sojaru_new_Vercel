@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Instagram, Twitter, Facebook, ArrowRight } from "lucide-react";
+import { Instagram, Facebook, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useStore } from "@/context/StoreContext";
 
@@ -58,8 +58,11 @@ export function Footer() {
               </div>
             </form>
             <div className="mt-6 flex items-center gap-3">
-              {[Instagram, Twitter, Facebook].map((Icon, i) => (
-                <a key={i} href="#" aria-label="Social" className="flex h-8 w-8 items-center justify-center border border-border text-ink/40 transition-colors hover:border-ink hover:text-ink">
+              {[
+                { Icon: Instagram, href: "https://www.instagram.com/sojaru.customs?stkn=MWM2enR3ZmFxbTkxNA==", label: "Instagram" },
+                { Icon: Facebook, href: "https://www.facebook.com/share/1EztS1bNT7/?mibextid=wwXIfr", label: "Facebook" },
+              ].map(({ Icon, href, label }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" aria-label={label} data-testid={`footer-social-${label.toLowerCase()}`} className="flex h-8 w-8 items-center justify-center border border-border text-ink/40 transition-colors hover:border-ink hover:text-ink">
                   <Icon className="h-3.5 w-3.5" />
                 </a>
               ))}
@@ -79,9 +82,7 @@ export function Footer() {
             <FooterCol title="For You" links={forYouSubs.map((c) => ({ to: `/category/${c.slug}`, label: c.name }))} />
             <FooterCol title="For Your Pet" links={forPetSubs.map((c) => ({ to: `/category/${c.slug}`, label: c.name }))} />
             <FooterCol title="Information" links={[
-              { to: "/about", label: "About Us" },
               { to: "/contact", label: "Contact" },
-              { to: "/faq", label: "FAQ" },
               { to: "/shipping-returns", label: "Shipping & Returns" },
               { to: "/privacy", label: "Privacy Policy" },
               { to: "/terms", label: "Terms & Conditions" },

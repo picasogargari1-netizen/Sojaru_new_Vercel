@@ -52,7 +52,6 @@ function App() {
                 <Route path="/account" element={<AccountPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
-                <Route path="/about" element={<InfoPage page="about" />} />
                 <Route path="/contact" element={<InfoPage page="contact" />} />
                 <Route path="/faq" element={<InfoPage page="faq" />} />
                 <Route path="/shipping-returns" element={<InfoPage page="shipping-returns" />} />
