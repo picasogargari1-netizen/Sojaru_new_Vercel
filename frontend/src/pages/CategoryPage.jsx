@@ -29,8 +29,14 @@ function attrValues(items, name) {
 
 export default function CategoryPage({ special }) {
   const { slug } = useParams();
-  const { bySlug, loaded } = useStore();
+  const { bySlug, loaded, childrenOf } = useStore();
   const category = special ? null : bySlug(slug);
+
+  // Dynamic "sections" = child categories of this sub-category (e.g. Clothing → T-shirts,
+  // Female Crop Tops). Pulled live from WooCommerce, so adding a child in wp-admin makes a
+  // new filter appear here automatically. Empty for top-level/special pages.
+  const sections = useMemo(() => (category ? childrenOf(category.id) : []), [category, childrenOf]);
+  const [activeSection, setActiveSection] = useState(null); // null = "All"
 
   const [sort, setSort] = useState("featured");
   const [inStock, setInStock] = useState(false);
@@ -53,7 +59,10 @@ export default function CategoryPage({ special }) {
 
   const effectiveSort = special === "new-arrivals" ? SORTS[1] : SORTS.find((s) => s.v === sort);
 
-  useEffect(() => { setPage(1); }, [slug, special, sort, inStock, priceMin, priceMax]);
+  // Reset selected section when navigating to a different category page
+  useEffect(() => { setActiveSection(null); }, [slug, special]);
+
+  useEffect(() => { setPage(1); }, [slug, special, sort, inStock, priceMin, priceMax, activeSection]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -63,7 +72,8 @@ export default function CategoryPage({ special }) {
       per_page: 12, page,
       ...effectiveSort.params,
     };
-    if (category) params.category = category.id;
+    // A selected section narrows to that child category; otherwise the parent category
+    if (category) params.category = activeSection || category.id;
     if (special === "sale") params.on_sale = true;
     if (special === "new-arrivals") { params.orderby = "date"; params.order = "desc"; }
     if (inStock) params.stock_status = "instock";
@@ -77,7 +87,7 @@ export default function CategoryPage({ special }) {
       .catch(() => setError(true))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, slug, special, category?.id, page, sort, inStock, priceMin, priceMax]);
+  }, [loaded, slug, special, category?.id, activeSection, page, sort, inStock, priceMin, priceMax]);
 
   const availSizes = useMemo(() => attrValues(items, "size"), [items]);
   const availColors = useMemo(() => attrValues(items, "color"), [items]);
@@ -154,6 +164,28 @@ export default function CategoryPage({ special }) {
         <p className="eyebrow text-terracotta">Sojaru</p>
         <h1 className="mt-2 font-display text-4xl text-ink sm:text-5xl">{title}</h1>
         {desc && <p className="mt-3 max-w-2xl text-base text-muted-foreground" dangerouslySetInnerHTML={{ __html: desc }} />}
+
+        {sections.length > 0 && (
+          <div className="mt-6 flex flex-wrap gap-2.5" data-testid="section-filters">
+            <button
+              onClick={() => setActiveSection(null)}
+              data-testid="section-filter-all"
+              className={`border px-4 py-1.5 text-sm font-medium transition-colors ${activeSection === null ? "border-ink bg-ink text-cream" : "border-border text-ink hover:border-ink"}`}
+            >
+              All
+            </button>
+            {sections.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => setActiveSection(s.id)}
+                data-testid={`section-filter-${s.slug}`}
+                className={`border px-4 py-1.5 text-sm font-medium transition-colors ${activeSection === s.id ? "border-ink bg-ink text-cream" : "border-border text-ink hover:border-ink"}`}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="mt-8 flex gap-10">
