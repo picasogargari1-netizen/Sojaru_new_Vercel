@@ -105,6 +105,39 @@ function emailShell(inner, buttonLabel) {
   </body></html>`;
 }
 
+// Owner/admin notification for a paid order — independent of the customer email
+function adminOrderEmailHtml({ order, paymentId }) {
+  const b = order.billing || {};
+  const s = order.shipping || {};
+  const addr = (x) => [x.address_1, x.address_2, x.city, x.state, x.postcode, x.country].filter(Boolean).join(", ");
+  const rows = (order.line_items || []).map((li) => `<tr>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(li.name)} <span style="color:#999;">&times; ${esc(li.quantity)}</span></td>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};text-align:right;white-space:nowrap;">${money(li.total, order.currency)}</td>
+    </tr>`).join("");
+  const line = (label, val) => val ? `<tr>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:12px;color:#8a837c;text-transform:uppercase;letter-spacing:1px;width:130px;vertical-align:top;">${label}</td>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(val)}</td>
+    </tr>` : "";
+  return emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:${BRAND.ink};">New paid order received 🎉</h1>
+    <p style="margin:0 0 22px;color:#6b6560;font-size:14px;line-height:1.6;">Order <strong style="color:${BRAND.ink};">#${esc(order.id)}</strong> has been paid via Razorpay and is now <strong style="color:${BRAND.ink};text-transform:capitalize;">${esc(order.status || "processing")}</strong>.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">${rows}
+      <tr>
+        <td style="padding:14px 4px 0;font-size:15px;font-weight:bold;color:${BRAND.ink};">Total</td>
+        <td style="padding:14px 4px 0;font-size:15px;font-weight:bold;color:${BRAND.ink};text-align:right;">${money(order.total, order.currency)}</td>
+      </tr>
+    </table>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:22px;">
+      ${line("Customer", [b.first_name, b.last_name].filter(Boolean).join(" "))}
+      ${line("Email", b.email)}
+      ${line("Phone", b.phone)}
+      ${line("Ship To", addr(s))}
+      ${line("Payment ID", paymentId)}
+      ${line("Note", order.customer_note)}
+    </table>
+  `, "View Store");
+}
+
 function orderEmailHtml({ name, orderId, total, currency, items, status }) {
   const rows = (items || []).map((li) => `<tr>
       <td style="padding:10px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(li.name)} <span style="color:#999;">&times; ${esc(li.quantity)}</span></td>
@@ -144,10 +177,13 @@ function customizationEmailHtml({ name, product_type, size, color, material, add
 
 // Awaitable + never-throws. Must be awaited before sending the HTTP response so it
 // reliably runs on Vercel serverless (functions can freeze right after the response).
-function sendMail({ to, subject, html }) {
+// By default CCs the owner (SMTP_FROM); pass cc: null to skip the CC.
+function sendMail({ to, subject, html, cc }) {
   const t = getTransporter();
   if (!t || !to) { if (!t) console.warn("SMTP not configured; skipping email to", to); return Promise.resolve(); }
-  return t.sendMail({ from: `Sojaru <${SMTP_FROM}>`, to, cc: SMTP_FROM, replyTo: SMTP_FROM, subject, html })
+  const msg = { from: `Sojaru <${SMTP_FROM}>`, to, replyTo: SMTP_FROM, subject, html };
+  if (cc !== null) msg.cc = cc || SMTP_FROM;
+  return t.sendMail(msg)
     .then((info) => console.log("Email sent:", info.messageId, "->", to))
     .catch((err) => console.error("Email send failed:", err.message));
 }
@@ -170,6 +206,9 @@ app.use(cors({
   origin: corsOrigins === "*" ? "*" : corsOrigins.split(","),
   credentials: true,
 }));
+// Razorpay webhook needs the RAW body for signature verification — must be
+// registered before express.json() (body-parser skips already-parsed requests).
+app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 
 // Multer v2 — no storage engine; file data read from stream
@@ -417,19 +456,28 @@ app.post("/api/orders", wrap(async (req, res) => {
   const r = await wc("POST", "orders", null, payload);
   const o = r.data;
 
-  // Create a Razorpay order for the WooCommerce order total (authoritative amount)
+  // Create a Razorpay order for the WooCommerce order total (authoritative amount).
+  // If Razorpay order creation fails, still return the (unpaid) WC order so the
+  // frontend can show a clear "payment gateway unavailable" state instead of a
+  // generic order failure — the WC order already exists at this point.
   const rzp = getRazorpay();
   let razorpay_order_id = null, razorpay_amount = null;
   if (rzp) {
-    const amountPaise = Math.round(Number(o.total) * 100);
-    const rzpOrder = await rzp.orders.create({
-      amount: amountPaise,
-      currency: o.currency || "INR",
-      receipt: `wc_${o.id}`,
-      notes: { wc_order_id: String(o.id), customer_email: (b.billing && b.billing.email) || "" },
-    });
-    razorpay_order_id = rzpOrder.id;
-    razorpay_amount = rzpOrder.amount;
+    try {
+      const amountPaise = Math.round(Number(o.total) * 100);
+      const rzpOrder = await rzp.orders.create({
+        amount: amountPaise,
+        currency: o.currency || "INR",
+        receipt: `wc_${o.id}`,
+        notes: { wc_order_id: String(o.id), customer_email: (b.billing && b.billing.email) || "" },
+      });
+      razorpay_order_id = rzpOrder.id;
+      razorpay_amount = rzpOrder.amount;
+    } catch (rzpErr) {
+      console.error("Razorpay order creation failed for WC order", o.id, ":", rzpErr.message);
+    }
+  } else {
+    console.error("Razorpay not configured — WC order", o.id, "created without a payment order");
   }
 
   res.json({
@@ -438,6 +486,56 @@ app.post("/api/orders", wrap(async (req, res) => {
     razorpay_order_id, razorpay_key_id: RAZORPAY_KEY_ID || null, razorpay_amount,
   });
 }));
+
+// ─── Payment confirmation (shared by checkout verify + Razorpay webhook) ─────
+// Sends BOTH the customer confirmation and the owner notification email.
+async function sendOrderEmails(o, paymentId) {
+  // Customer confirmation
+  const billingEmail = o.billing && o.billing.email ? String(o.billing.email).trim() : "";
+  const billingName = o.billing ? [o.billing.first_name, o.billing.last_name].filter(Boolean).join(" ") : "";
+  if (billingEmail) {
+    await sendMail({
+      to: billingEmail,
+      cc: null, // owner gets a dedicated notification below (no CC needed here)
+      subject: `Your Sojaru order #${o.id} is confirmed 🐾`,
+      html: orderEmailHtml({ name: billingName, orderId: o.id, total: o.total, currency: o.currency, items: o.line_items, status: o.status }),
+    });
+  }
+  // Owner/admin notification — independent of the customer email
+  const ownerEmail = (process.env.ADMIN_EMAIL || SMTP_FROM || "").trim();
+  if (ownerEmail) {
+    await sendMail({
+      to: ownerEmail,
+      cc: null,
+      subject: `New paid order #${o.id} — ${money(o.total, o.currency)}`,
+      html: adminOrderEmailHtml({ order: o, paymentId }),
+    });
+  }
+}
+
+// Idempotently mark a WC order paid and send notification emails exactly once.
+// A `paid_orders` marker doc (keyed by wc order id) dedupes the checkout verify
+// call and the Razorpay webhook so the customer/owner never get duplicate emails.
+async function confirmPaidOrder({ wcOrderId, paymentId, source }) {
+  const db = await getDb();
+  let already = false;
+  try {
+    await db.collection("paid_orders").insertOne({
+      _id: `wc_${wcOrderId}`, wc_order_id: String(wcOrderId),
+      payment_id: paymentId || "", source: source || "unknown",
+      confirmed_at: new Date().toISOString(),
+    });
+  } catch (e) {
+    if (e && e.code === 11000) already = true; else throw e;
+  }
+  // PUT is idempotent — always run it (self-heals if a previous attempt died mid-way)
+  const upd = await wc("PUT", `orders/${wcOrderId}`, null, {
+    set_paid: true, status: "processing", transaction_id: paymentId || "",
+  });
+  const o = upd.data;
+  if (!already) await sendOrderEmails(o, paymentId);
+  return { order: o, already };
+}
 
 // Verify a Razorpay payment and mark the WooCommerce order as paid
 app.post("/api/payments/verify", wrap(async (req, res) => {
@@ -453,24 +551,42 @@ app.post("/api/payments/verify", wrap(async (req, res) => {
     const e = new Error("Payment verification failed"); e.status = 400; throw e;
   }
 
-  // Mark the WooCommerce order paid
-  const upd = await wc("PUT", `orders/${wc_order_id}`, null, {
-    set_paid: true, status: "processing", transaction_id: razorpay_payment_id,
-  });
-  const o = upd.data;
+  const { order: o } = await confirmPaidOrder({ wcOrderId: wc_order_id, paymentId: razorpay_payment_id, source: "checkout" });
+  res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, paid: true });
+}));
 
-  // Send branded confirmation email now that payment succeeded — awaited for serverless reliability
-  const billingEmail = o.billing && o.billing.email ? String(o.billing.email).trim() : "";
-  const billingName = o.billing ? [o.billing.first_name, o.billing.last_name].filter(Boolean).join(" ") : "";
-  if (billingEmail) {
-    await sendMail({
-      to: billingEmail,
-      subject: `Your Sojaru order #${o.id} is confirmed 🐾`,
-      html: orderEmailHtml({ name: billingName, orderId: o.id, total: o.total, currency: o.currency, items: o.line_items, status: o.status }),
-    });
+// Razorpay webhook — safety net that confirms payment even if the customer's
+// browser closes (or network drops) before the frontend calls /api/payments/verify.
+// Setup: Razorpay Dashboard → Webhooks → URL: https://<backend>/api/payments/webhook,
+// event: payment.captured, and put the webhook secret in RAZORPAY_WEBHOOK_SECRET.
+app.post("/api/payments/webhook", wrap(async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) { const e = new Error("Webhook not configured"); e.status = 500; throw e; }
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body || {}));
+  const signature = String(req.headers["x-razorpay-signature"] || "");
+  const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(expected), bBuf = Buffer.from(signature);
+  if (a.length !== bBuf.length || !crypto.timingSafeEqual(a, bBuf)) {
+    const e = new Error("Invalid webhook signature"); e.status = 400; throw e;
   }
 
-  res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, paid: true });
+  const event = JSON.parse(rawBody.toString("utf8"));
+  if (event.event !== "payment.captured") return res.json({ ok: true, ignored: event.event || "unknown" });
+
+  const payment = event.payload && event.payload.payment && event.payload.payment.entity;
+  if (!payment) return res.json({ ok: true, ignored: "no-payment-entity" });
+
+  // The WC order id lives on the Razorpay ORDER notes (set at order creation)
+  let wcOrderId = payment.notes && payment.notes.wc_order_id;
+  const rzp = getRazorpay();
+  if (!wcOrderId && rzp && payment.order_id) {
+    const rzpOrder = await rzp.orders.fetch(payment.order_id);
+    wcOrderId = rzpOrder.notes && rzpOrder.notes.wc_order_id;
+  }
+  if (!wcOrderId) return res.json({ ok: true, ignored: "no-wc-order-id" });
+
+  const { order: o, already } = await confirmPaidOrder({ wcOrderId, paymentId: payment.id, source: "webhook" });
+  res.json({ ok: true, wc_order_id: o.id, status: o.status, already_confirmed: already });
 }));
 
 // Get order

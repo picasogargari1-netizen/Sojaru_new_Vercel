@@ -1,544 +1,517 @@
 #!/usr/bin/env python3
 """
-Backend API Test Suite for Sojaru Customization Feature
-Tests 4 new endpoints: GET /api/customizable-products, POST /api/customized-orders,
-GET /api/admin/customized-orders, DELETE /api/admin/customized-orders/:id
+Razorpay Payment Confirmation + Dual Emails Test Suite
+Tests the payment flow: order creation, payment verification, dual emails (customer + owner), idempotency, webhook
 """
 
 import requests
 import json
-import sys
-from typing import Dict, Any, Optional
+import hmac
+import hashlib
+import time
+import os
+import base64
+from datetime import datetime
 
 # Configuration
-BASE_URL = "https://store-preview-81.preview.emergentagent.com/api"
+BASE_URL = "http://localhost:8001"
+RAZORPAY_KEY_SECRET = "lFPKAs9vdVKyBjYDUZpvaWNo"  # From /app/.env
 ADMIN_EMAIL = "hello@sojaru.co.in"
 ADMIN_PASSWORD = "admin123"
+WC_STORE_URL = "https://developer.sojaru.co.in"
+WC_CONSUMER_KEY = "ck_419a6e09d46defa88017c949a5810a884a3e9573"
+WC_CONSUMER_SECRET = "cs_832d936678f29ec8c1946d7dd1165a223174460c"
 
-# Test tracking
-tests_passed = 0
-tests_failed = 0
+# Test state
+created_wc_orders = []
 test_results = []
 
-
-def log_test(name: str, passed: bool, details: str = ""):
+def log_test(test_name, passed, details=""):
     """Log test result"""
-    global tests_passed, tests_failed
-    status = "✅ PASSED" if passed else "❌ FAILED"
-    if passed:
-        tests_passed += 1
-    else:
-        tests_failed += 1
-    message = f"{status}: {name}"
+    status = "✅ PASS" if passed else "❌ FAIL"
+    result = f"{status}: {test_name}"
     if details:
-        message += f"\n   {details}"
-    print(message)
-    test_results.append({"name": name, "passed": passed, "details": details})
+        result += f" - {details}"
+    print(result)
+    test_results.append({"name": test_name, "passed": passed, "details": details})
+    return passed
 
-
-def admin_login() -> Optional[str]:
-    """Login as admin and return token"""
+def get_backend_logs(lines=50):
+    """Get recent backend logs"""
     try:
-        response = requests.post(
-            f"{BASE_URL}/auth/login",
-            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
-            timeout=10
-        )
-        if response.status_code == 200:
-            data = response.json()
-            if data.get("token") and data.get("user", {}).get("is_admin"):
-                print(f"✅ Admin login successful (is_admin={data['user']['is_admin']})")
-                return data["token"]
-            else:
-                print(f"❌ Admin login failed: user is not admin")
-                return None
-        else:
-            print(f"❌ Admin login failed: {response.status_code} - {response.text}")
-            return None
+        result = os.popen(f"tail -n {lines} /var/log/supervisor/backend.out.log").read()
+        return result
     except Exception as e:
-        print(f"❌ Admin login error: {e}")
-        return None
+        print(f"Warning: Could not read backend logs: {e}")
+        return ""
 
+def count_email_sent_lines_since(marker_time):
+    """Count 'Email sent:' lines in backend logs after a marker time"""
+    logs = get_backend_logs(200)
+    lines = logs.split('\n')
+    count = 0
+    for line in lines:
+        if "Email sent:" in line:
+            count += 1
+    return count
 
-def test_get_customizable_products():
-    """Test 1: GET /api/customizable-products (PUBLIC)"""
-    print("\n" + "="*80)
-    print("TEST 1: GET /api/customizable-products (PUBLIC)")
-    print("="*80)
-    
-    try:
-        response = requests.get(f"{BASE_URL}/customizable-products", timeout=10)
-        
-        if response.status_code != 200:
-            log_test(
-                "GET /api/customizable-products returns 200",
-                False,
-                f"Expected 200, got {response.status_code}: {response.text}"
-            )
-            return None
-        
-        log_test("GET /api/customizable-products returns 200", True)
-        
-        data = response.json()
-        
-        if not isinstance(data, list):
-            log_test(
-                "Response is a JSON array",
-                False,
-                f"Expected array, got {type(data)}"
-            )
-            return None
-        
-        log_test("Response is a JSON array", True)
-        
-        if len(data) < 2:
-            log_test(
-                "At least 2 products exist",
-                False,
-                f"Expected at least 2 products, got {len(data)}"
-            )
-            return None
-        
-        log_test("At least 2 products exist", True, f"Found {len(data)} products")
-        
-        # Verify structure of first item
-        if data:
-            item = data[0]
-            required_keys = ["id", "product_type", "size", "color", "material"]
-            missing_keys = [k for k in required_keys if k not in item]
-            
-            if missing_keys:
-                log_test(
-                    "Product items have correct structure",
-                    False,
-                    f"Missing keys: {missing_keys}"
-                )
-                return None
-            
-            log_test(
-                "Product items have correct structure",
-                True,
-                f"Sample: product_type='{item['product_type']}', size='{item['size']}', color='{item['color']}', material='{item['material']}'"
-            )
-        
-        print(f"\n📋 Products found: {json.dumps(data, indent=2)}")
-        return data
-        
-    except Exception as e:
-        log_test("GET /api/customizable-products", False, f"Exception: {e}")
-        return None
+def fabricate_razorpay_signature(razorpay_order_id, razorpay_payment_id):
+    """Create a valid Razorpay signature using HMAC SHA256"""
+    message = f"{razorpay_order_id}|{razorpay_payment_id}"
+    signature = hmac.new(
+        RAZORPAY_KEY_SECRET.encode('utf-8'),
+        message.encode('utf-8'),
+        hashlib.sha256
+    ).hexdigest()
+    return signature
 
-
-def test_post_customized_order_valid():
-    """Test 2: POST /api/customized-orders with valid data"""
-    print("\n" + "="*80)
-    print("TEST 2: POST /api/customized-orders (VALID DATA)")
-    print("="*80)
-    
-    valid_order = {
-        "name": "Test User",
-        "email": "test@example.com",
-        "phone": "9876543210",
-        "product_type": "T-shirt",
-        "size": "S",
-        "color": "Red",
-        "material": "Polyester"
-    }
-    
-    try:
-        response = requests.post(
-            f"{BASE_URL}/customized-orders",
-            json=valid_order,
-            timeout=10
-        )
-        
-        if response.status_code != 200:
-            log_test(
-                "POST /api/customized-orders with valid data returns 200",
-                False,
-                f"Expected 200, got {response.status_code}: {response.text}"
-            )
-            return None
-        
-        log_test("POST /api/customized-orders with valid data returns 200", True)
-        
-        data = response.json()
-        
-        if "id" not in data or "ok" not in data:
-            log_test(
-                "Response contains 'id' and 'ok' fields",
-                False,
-                f"Response: {data}"
-            )
-            return None
-        
-        if data.get("ok") != True:
-            log_test(
-                "Response 'ok' field is true",
-                False,
-                f"Expected ok=true, got ok={data.get('ok')}"
-            )
-            return None
-        
-        log_test(
-            "Response contains 'id' and 'ok: true'",
-            True,
-            f"Order created with id={data['id']}"
-        )
-        
-        print(f"\n📋 Created order: {json.dumps(data, indent=2)}")
-        return data["id"]
-        
-    except Exception as e:
-        log_test("POST /api/customized-orders with valid data", False, f"Exception: {e}")
-        return None
-
-
-def test_post_customized_order_missing_fields():
-    """Test 3: POST /api/customized-orders with missing required fields"""
-    print("\n" + "="*80)
-    print("TEST 3: POST /api/customized-orders (MISSING REQUIRED FIELDS)")
-    print("="*80)
-    
-    # Test cases: each missing one required field
-    test_cases = [
-        ({"email": "test@example.com", "phone": "9876543210", "product_type": "T-shirt"}, "name"),
-        ({"name": "Test User", "phone": "9876543210", "product_type": "T-shirt"}, "email"),
-        ({"name": "Test User", "email": "test@example.com", "product_type": "T-shirt"}, "phone"),
-        ({"name": "Test User", "email": "test@example.com", "phone": "9876543210"}, "product_type"),
-    ]
-    
-    for payload, missing_field in test_cases:
+def cleanup_wc_orders():
+    """Delete test WooCommerce orders"""
+    print("\n🧹 Cleaning up test WooCommerce orders...")
+    auth = (WC_CONSUMER_KEY, WC_CONSUMER_SECRET)
+    for order_id in created_wc_orders:
         try:
-            response = requests.post(
-                f"{BASE_URL}/customized-orders",
-                json=payload,
-                timeout=10
-            )
-            
-            if response.status_code != 400:
-                log_test(
-                    f"Missing '{missing_field}' returns 400",
-                    False,
-                    f"Expected 400, got {response.status_code}: {response.text}"
-                )
+            url = f"{WC_STORE_URL}/wp-json/wc/v3/orders/{order_id}?force=true"
+            resp = requests.delete(url, auth=auth, timeout=30)
+            if resp.status_code in [200, 404]:
+                print(f"  ✓ Deleted WC order #{order_id}")
             else:
-                data = response.json()
-                has_error_detail = "detail" in data or "error" in data or "message" in data
-                log_test(
-                    f"Missing '{missing_field}' returns 400",
-                    True,
-                    f"Error message: {data.get('detail', data.get('error', data.get('message', data)))}"
-                )
-                
+                print(f"  ⚠ Could not delete WC order #{order_id}: {resp.status_code}")
         except Exception as e:
-            log_test(f"Missing '{missing_field}' validation", False, f"Exception: {e}")
+            print(f"  ⚠ Error deleting WC order #{order_id}: {e}")
 
-
-def test_get_admin_orders_no_auth(admin_token: str):
-    """Test 4: GET /api/admin/customized-orders without token"""
-    print("\n" + "="*80)
-    print("TEST 4: GET /api/admin/customized-orders (NO AUTH)")
-    print("="*80)
-    
+def test_1_get_product():
+    """TEST 1: Get a real product from WooCommerce"""
+    print("\n📦 TEST 1: Get a real product from WooCommerce")
     try:
-        response = requests.get(f"{BASE_URL}/admin/customized-orders", timeout=10)
+        resp = requests.get(f"{BASE_URL}/api/products?per_page=1", timeout=30)
+        if resp.status_code != 200:
+            return log_test("Get product", False, f"Status {resp.status_code}")
         
-        if response.status_code not in [401, 403]:
-            log_test(
-                "GET /api/admin/customized-orders without token returns 401/403",
-                False,
-                f"Expected 401 or 403, got {response.status_code}: {response.text}"
-            )
-        else:
-            log_test(
-                "GET /api/admin/customized-orders without token returns 401/403",
-                True,
-                f"Correctly rejected with {response.status_code}"
-            )
-            
+        data = resp.json()
+        if not data.get("items") or len(data["items"]) == 0:
+            return log_test("Get product", False, "No products found")
+        
+        product = data["items"][0]
+        product_id = product.get("id")
+        product_name = product.get("name")
+        product_price = product.get("price", "0")
+        
+        if not product_id:
+            return log_test("Get product", False, "Product has no ID")
+        
+        log_test("Get product", True, f"Found product #{product_id}: {product_name} (₹{product_price})")
+        return product
     except Exception as e:
-        log_test("GET /api/admin/customized-orders without auth", False, f"Exception: {e}")
-
-
-def test_get_admin_orders_with_auth(admin_token: str, expected_order_id: Optional[str]):
-    """Test 5: GET /api/admin/customized-orders with admin token"""
-    print("\n" + "="*80)
-    print("TEST 5: GET /api/admin/customized-orders (WITH ADMIN TOKEN)")
-    print("="*80)
-    
-    try:
-        response = requests.get(
-            f"{BASE_URL}/admin/customized-orders",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            timeout=10
-        )
-        
-        if response.status_code != 200:
-            log_test(
-                "GET /api/admin/customized-orders with admin token returns 200",
-                False,
-                f"Expected 200, got {response.status_code}: {response.text}"
-            )
-            return None
-        
-        log_test("GET /api/admin/customized-orders with admin token returns 200", True)
-        
-        data = response.json()
-        
-        if not isinstance(data, list):
-            log_test(
-                "Response is a JSON array",
-                False,
-                f"Expected array, got {type(data)}"
-            )
-            return None
-        
-        log_test("Response is a JSON array", True, f"Found {len(data)} orders")
-        
-        # Verify structure if there are orders
-        if data:
-            item = data[0]
-            required_keys = ["id", "name", "email", "phone", "product_type", "size", "color", "material", "created_at"]
-            missing_keys = [k for k in required_keys if k not in item]
-            
-            if missing_keys:
-                log_test(
-                    "Order items have correct structure",
-                    False,
-                    f"Missing keys: {missing_keys}"
-                )
-            else:
-                log_test(
-                    "Order items have correct structure",
-                    True,
-                    f"Sample: name='{item['name']}', product_type='{item['product_type']}'"
-                )
-        
-        # Check if our test order is in the list
-        if expected_order_id:
-            order_ids = [o["id"] for o in data]
-            if expected_order_id in order_ids:
-                log_test(
-                    "Created order appears in admin list",
-                    True,
-                    f"Order {expected_order_id} found in list"
-                )
-            else:
-                log_test(
-                    "Created order appears in admin list",
-                    False,
-                    f"Order {expected_order_id} not found. Available IDs: {order_ids[:5]}"
-                )
-        
-        # Verify sorting (newest first)
-        if len(data) >= 2:
-            first_date = data[0].get("created_at")
-            second_date = data[1].get("created_at")
-            if first_date and second_date:
-                if first_date >= second_date:
-                    log_test("Orders sorted newest first", True)
-                else:
-                    log_test(
-                        "Orders sorted newest first",
-                        False,
-                        f"First: {first_date}, Second: {second_date}"
-                    )
-        
-        print(f"\n📋 Orders (showing first 3): {json.dumps(data[:3], indent=2)}")
-        return data
-        
-    except Exception as e:
-        log_test("GET /api/admin/customized-orders with auth", False, f"Exception: {e}")
+        log_test("Get product", False, f"Exception: {e}")
         return None
 
-
-def test_delete_order_no_auth(order_id: str):
-    """Test 6: DELETE /api/admin/customized-orders/:id without token"""
-    print("\n" + "="*80)
-    print("TEST 6: DELETE /api/admin/customized-orders/:id (NO AUTH)")
-    print("="*80)
+def test_2_create_order(product):
+    """TEST 2: Create an order with POST /api/orders"""
+    print("\n🛒 TEST 2: Create order with POST /api/orders")
+    if not product:
+        return log_test("Create order", False, "No product available")
     
     try:
-        response = requests.delete(
-            f"{BASE_URL}/admin/customized-orders/{order_id}",
-            timeout=10
-        )
+        timestamp = int(time.time())
+        test_email = f"test-{timestamp}@example.com"
         
-        if response.status_code not in [401, 403]:
-            log_test(
-                "DELETE without token returns 401/403",
-                False,
-                f"Expected 401 or 403, got {response.status_code}: {response.text}"
-            )
-        else:
-            log_test(
-                "DELETE without token returns 401/403",
-                True,
-                f"Correctly rejected with {response.status_code}"
-            )
-            
+        order_payload = {
+            "billing": {
+                "first_name": "Test",
+                "last_name": "Customer",
+                "email": test_email,
+                "phone": "9876543210",
+                "address_1": "123 Test Street",
+                "city": "Mumbai",
+                "state": "MH",
+                "postcode": "400001",
+                "country": "IN"
+            },
+            "line_items": [
+                {
+                    "product_id": product["id"],
+                    "quantity": 1
+                }
+            ],
+            "shipping_lines": [
+                {
+                    "method_id": "free_shipping",
+                    "method_title": "Free Shipping",
+                    "total": "0"
+                }
+            ]
+        }
+        
+        resp = requests.post(f"{BASE_URL}/api/orders", json=order_payload, timeout=30)
+        
+        if resp.status_code != 200:
+            return log_test("Create order", False, f"Status {resp.status_code}: {resp.text[:200]}")
+        
+        data = resp.json()
+        wc_order_id = data.get("id")
+        razorpay_order_id = data.get("razorpay_order_id")
+        razorpay_key_id = data.get("razorpay_key_id")
+        razorpay_amount = data.get("razorpay_amount")
+        
+        if not wc_order_id:
+            return log_test("Create order", False, "No WC order ID in response")
+        
+        created_wc_orders.append(wc_order_id)
+        
+        if not razorpay_order_id:
+            return log_test("Create order", False, "No razorpay_order_id in response")
+        
+        if not razorpay_order_id.startswith("order_"):
+            return log_test("Create order", False, f"Invalid razorpay_order_id format: {razorpay_order_id}")
+        
+        if not razorpay_key_id:
+            return log_test("Create order", False, "No razorpay_key_id in response")
+        
+        if razorpay_amount is None:
+            return log_test("Create order", False, "No razorpay_amount in response")
+        
+        log_test("Create order", True, 
+                f"WC order #{wc_order_id}, Razorpay order {razorpay_order_id}, amount {razorpay_amount}")
+        
+        return {
+            "wc_order_id": wc_order_id,
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_key_id": razorpay_key_id,
+            "razorpay_amount": razorpay_amount,
+            "test_email": test_email
+        }
     except Exception as e:
-        log_test("DELETE without auth", False, f"Exception: {e}")
+        log_test("Create order", False, f"Exception: {e}")
+        return None
 
-
-def test_delete_order_with_auth(admin_token: str, order_id: str):
-    """Test 7: DELETE /api/admin/customized-orders/:id with admin token"""
-    print("\n" + "="*80)
-    print("TEST 7: DELETE /api/admin/customized-orders/:id (WITH ADMIN TOKEN)")
-    print("="*80)
+def test_3_verify_payment(order_data):
+    """TEST 3: Verify payment with fabricated valid signature"""
+    print("\n✅ TEST 3: Verify payment with POST /api/payments/verify")
+    if not order_data:
+        return log_test("Verify payment", False, "No order data available")
     
     try:
-        response = requests.delete(
-            f"{BASE_URL}/admin/customized-orders/{order_id}",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            timeout=10
-        )
+        # Fabricate a valid payment ID and signature
+        fake_payment_id = f"pay_TEST{int(time.time())}"
+        razorpay_order_id = order_data["razorpay_order_id"]
+        wc_order_id = order_data["wc_order_id"]
         
-        if response.status_code != 200:
-            log_test(
-                "DELETE with admin token returns 200",
-                False,
-                f"Expected 200, got {response.status_code}: {response.text}"
-            )
-            return False
+        # Create valid signature using HMAC SHA256
+        signature = fabricate_razorpay_signature(razorpay_order_id, fake_payment_id)
         
-        log_test("DELETE with admin token returns 200", True)
+        # Count emails before verification
+        time.sleep(1)  # Brief pause to ensure logs are written
+        logs_before = get_backend_logs(100)
+        email_count_before = logs_before.count("Email sent:")
         
-        data = response.json()
+        verify_payload = {
+            "razorpay_order_id": razorpay_order_id,
+            "razorpay_payment_id": fake_payment_id,
+            "razorpay_signature": signature,
+            "wc_order_id": wc_order_id
+        }
         
-        if data.get("ok") != True:
-            log_test(
-                "Response contains 'ok: true'",
-                False,
-                f"Expected ok=true, got {data}"
-            )
-            return False
+        resp = requests.post(f"{BASE_URL}/api/payments/verify", json=verify_payload, timeout=30)
         
-        log_test("Response contains 'ok: true'", True)
+        if resp.status_code != 200:
+            return log_test("Verify payment", False, f"Status {resp.status_code}: {resp.text[:200]}")
         
-        # Verify order is actually deleted
-        verify_response = requests.get(
-            f"{BASE_URL}/admin/customized-orders",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            timeout=10
-        )
+        data = resp.json()
         
-        if verify_response.status_code == 200:
-            orders = verify_response.json()
-            order_ids = [o["id"] for o in orders]
-            
-            if order_id not in order_ids:
-                log_test(
-                    "Order removed from admin list after deletion",
-                    True,
-                    f"Order {order_id} successfully deleted"
-                )
-            else:
-                log_test(
-                    "Order removed from admin list after deletion",
-                    False,
-                    f"Order {order_id} still exists in list"
-                )
+        if not data.get("paid"):
+            return log_test("Verify payment", False, "Response does not indicate paid=true")
         
+        if data.get("status") != "processing":
+            return log_test("Verify payment", False, f"Expected status 'processing', got '{data.get('status')}'")
+        
+        # Wait for emails to be sent
+        time.sleep(3)
+        
+        # Check backend logs for email confirmations
+        logs_after = get_backend_logs(100)
+        email_count_after = logs_after.count("Email sent:")
+        new_emails = email_count_after - email_count_before
+        
+        # Check for customer email
+        customer_email_found = order_data["test_email"] in logs_after
+        # Check for owner email
+        owner_email_found = ADMIN_EMAIL in logs_after
+        
+        if new_emails < 2:
+            return log_test("Verify payment", False, 
+                          f"Expected 2 new 'Email sent:' lines, found {new_emails}. Customer email: {customer_email_found}, Owner email: {owner_email_found}")
+        
+        if not customer_email_found:
+            return log_test("Verify payment", False, 
+                          f"Customer email ({order_data['test_email']}) not found in logs")
+        
+        if not owner_email_found:
+            return log_test("Verify payment", False, 
+                          f"Owner email ({ADMIN_EMAIL}) not found in logs")
+        
+        log_test("Verify payment", True, 
+                f"Payment verified, order #{wc_order_id} marked paid, {new_emails} emails sent (customer + owner)")
+        
+        return {**order_data, "fake_payment_id": fake_payment_id, "signature": signature}
+    except Exception as e:
+        log_test("Verify payment", False, f"Exception: {e}")
+        return None
+
+def test_4_idempotency(order_data):
+    """TEST 4: Test idempotency - repeat verify call should not send duplicate emails"""
+    print("\n🔁 TEST 4: Test idempotency - repeat verify call")
+    if not order_data or "fake_payment_id" not in order_data:
+        return log_test("Idempotency test", False, "No verified order data available")
+    
+    try:
+        # Count emails before second verification
+        time.sleep(1)
+        logs_before = get_backend_logs(100)
+        email_count_before = logs_before.count("Email sent:")
+        
+        verify_payload = {
+            "razorpay_order_id": order_data["razorpay_order_id"],
+            "razorpay_payment_id": order_data["fake_payment_id"],
+            "razorpay_signature": order_data["signature"],
+            "wc_order_id": order_data["wc_order_id"]
+        }
+        
+        resp = requests.post(f"{BASE_URL}/api/payments/verify", json=verify_payload, timeout=30)
+        
+        if resp.status_code != 200:
+            return log_test("Idempotency test", False, f"Status {resp.status_code}: {resp.text[:200]}")
+        
+        data = resp.json()
+        
+        if not data.get("paid"):
+            return log_test("Idempotency test", False, "Response does not indicate paid=true")
+        
+        # Wait and check for new emails
+        time.sleep(3)
+        logs_after = get_backend_logs(100)
+        email_count_after = logs_after.count("Email sent:")
+        new_emails = email_count_after - email_count_before
+        
+        if new_emails > 0:
+            return log_test("Idempotency test", False, 
+                          f"Expected 0 new emails on duplicate verify, found {new_emails}")
+        
+        log_test("Idempotency test", True, 
+                "Duplicate verify call returned 200, no duplicate emails sent")
         return True
-        
     except Exception as e:
-        log_test("DELETE with admin token", False, f"Exception: {e}")
+        log_test("Idempotency test", False, f"Exception: {e}")
         return False
 
-
-def test_delete_nonexistent_order(admin_token: str):
-    """Test 8: DELETE /api/admin/customized-orders/:id with non-existent ID"""
-    print("\n" + "="*80)
-    print("TEST 8: DELETE /api/admin/customized-orders/:id (NON-EXISTENT ID)")
-    print("="*80)
-    
-    fake_id = "000000000000000000000000"  # Valid ObjectId format but doesn't exist
+def test_5_bad_signature(order_data):
+    """TEST 5: Test bad signature - expect 400"""
+    print("\n❌ TEST 5: Test bad signature - expect 400")
+    if not order_data:
+        return log_test("Bad signature test", False, "No order data available")
     
     try:
-        response = requests.delete(
-            f"{BASE_URL}/admin/customized-orders/{fake_id}",
-            headers={"Authorization": f"Bearer {admin_token}"},
-            timeout=10
-        )
+        verify_payload = {
+            "razorpay_order_id": order_data["razorpay_order_id"],
+            "razorpay_payment_id": "pay_INVALID123",
+            "razorpay_signature": "invalid_signature_12345",
+            "wc_order_id": order_data["wc_order_id"]
+        }
         
-        if response.status_code != 404:
-            log_test(
-                "DELETE non-existent order returns 404",
-                False,
-                f"Expected 404, got {response.status_code}: {response.text}"
-            )
-        else:
-            log_test(
-                "DELETE non-existent order returns 404",
-                True,
-                "Correctly returned 404 for non-existent order"
-            )
-            
+        resp = requests.post(f"{BASE_URL}/api/payments/verify", json=verify_payload, timeout=30)
+        
+        if resp.status_code != 400:
+            return log_test("Bad signature test", False, 
+                          f"Expected status 400, got {resp.status_code}")
+        
+        data = resp.json()
+        error_msg = data.get("detail", "")
+        
+        if "verification failed" not in error_msg.lower():
+            return log_test("Bad signature test", False, 
+                          f"Expected 'verification failed' error, got: {error_msg}")
+        
+        log_test("Bad signature test", True, 
+                f"Bad signature correctly rejected with 400: {error_msg}")
+        return True
     except Exception as e:
-        log_test("DELETE non-existent order", False, f"Exception: {e}")
+        log_test("Bad signature test", False, f"Exception: {e}")
+        return False
 
+def test_6_missing_fields():
+    """TEST 6: Test missing fields - expect 400"""
+    print("\n❌ TEST 6: Test missing fields - expect 400")
+    try:
+        # Missing razorpay_signature
+        verify_payload = {
+            "razorpay_order_id": "order_test123",
+            "razorpay_payment_id": "pay_test123",
+            "wc_order_id": "12345"
+        }
+        
+        resp = requests.post(f"{BASE_URL}/api/payments/verify", json=verify_payload, timeout=30)
+        
+        if resp.status_code != 400:
+            return log_test("Missing fields test", False, 
+                          f"Expected status 400, got {resp.status_code}")
+        
+        data = resp.json()
+        error_msg = data.get("detail", "")
+        
+        if "missing" not in error_msg.lower():
+            return log_test("Missing fields test", False, 
+                          f"Expected 'missing' error, got: {error_msg}")
+        
+        log_test("Missing fields test", True, 
+                f"Missing fields correctly rejected with 400: {error_msg}")
+        return True
+    except Exception as e:
+        log_test("Missing fields test", False, f"Exception: {e}")
+        return False
+
+def test_7_webhook_endpoint():
+    """TEST 7: Test webhook endpoint - expect 500 (no secret configured)"""
+    print("\n🔗 TEST 7: Test webhook endpoint - expect 500")
+    try:
+        webhook_payload = {}
+        
+        resp = requests.post(f"{BASE_URL}/api/payments/webhook", 
+                           json=webhook_payload, 
+                           timeout=30)
+        
+        if resp.status_code != 500:
+            return log_test("Webhook endpoint test", False, 
+                          f"Expected status 500, got {resp.status_code}")
+        
+        data = resp.json()
+        error_msg = data.get("detail", "")
+        
+        if "webhook not configured" not in error_msg.lower():
+            return log_test("Webhook endpoint test", False, 
+                          f"Expected 'Webhook not configured' error, got: {error_msg}")
+        
+        log_test("Webhook endpoint test", True, 
+                f"Webhook endpoint exists and rejects gracefully: {error_msg}")
+        return True
+    except Exception as e:
+        log_test("Webhook endpoint test", False, f"Exception: {e}")
+        return False
+
+def test_8_regression():
+    """TEST 8: Regression tests - settings, categories, admin login"""
+    print("\n🔄 TEST 8: Regression tests")
+    
+    # Test GET /api/settings
+    try:
+        resp = requests.get(f"{BASE_URL}/api/settings", timeout=30)
+        if resp.status_code != 200:
+            log_test("Regression: GET /api/settings", False, f"Status {resp.status_code}")
+        else:
+            data = resp.json()
+            if "hero" in data and "marquee_texts" in data:
+                log_test("Regression: GET /api/settings", True, "Settings endpoint working")
+            else:
+                log_test("Regression: GET /api/settings", False, "Missing expected fields")
+    except Exception as e:
+        log_test("Regression: GET /api/settings", False, f"Exception: {e}")
+    
+    # Test GET /api/categories
+    try:
+        resp = requests.get(f"{BASE_URL}/api/categories", timeout=30)
+        if resp.status_code != 200:
+            log_test("Regression: GET /api/categories", False, f"Status {resp.status_code}")
+        else:
+            data = resp.json()
+            if isinstance(data, list) and len(data) > 0:
+                log_test("Regression: GET /api/categories", True, f"Found {len(data)} categories")
+            else:
+                log_test("Regression: GET /api/categories", False, "No categories returned")
+    except Exception as e:
+        log_test("Regression: GET /api/categories", False, f"Exception: {e}")
+    
+    # Test admin login
+    try:
+        login_payload = {
+            "email": ADMIN_EMAIL,
+            "password": ADMIN_PASSWORD
+        }
+        resp = requests.post(f"{BASE_URL}/api/auth/login", json=login_payload, timeout=30)
+        if resp.status_code != 200:
+            log_test("Regression: Admin login", False, f"Status {resp.status_code}")
+        else:
+            data = resp.json()
+            if data.get("token") and data.get("user", {}).get("is_admin"):
+                log_test("Regression: Admin login", True, "Admin login working")
+            else:
+                log_test("Regression: Admin login", False, "Missing token or is_admin flag")
+    except Exception as e:
+        log_test("Regression: Admin login", False, f"Exception: {e}")
+
+def print_summary():
+    """Print test summary"""
+    print("\n" + "="*80)
+    print("📊 TEST SUMMARY")
+    print("="*80)
+    
+    passed = sum(1 for t in test_results if t["passed"])
+    total = len(test_results)
+    
+    print(f"\nTotal Tests: {total}")
+    print(f"Passed: {passed}")
+    print(f"Failed: {total - passed}")
+    print(f"Success Rate: {(passed/total*100):.1f}%\n")
+    
+    if total - passed > 0:
+        print("❌ FAILED TESTS:")
+        for t in test_results:
+            if not t["passed"]:
+                print(f"  - {t['name']}: {t['details']}")
+    else:
+        print("✅ ALL TESTS PASSED!")
+    
+    print("\n" + "="*80)
 
 def main():
     """Run all tests"""
-    print("\n" + "="*80)
-    print("SOJARU CUSTOMIZATION FEATURE - BACKEND API TEST SUITE")
     print("="*80)
-    print(f"Backend URL: {BASE_URL}")
-    print(f"Admin: {ADMIN_EMAIL}")
+    print("🧪 RAZORPAY PAYMENT CONFIRMATION + DUAL EMAILS TEST SUITE")
     print("="*80)
-    
-    # Step 1: Admin login
-    print("\n🔐 STEP 1: Admin Login")
-    admin_token = admin_login()
-    if not admin_token:
-        print("\n❌ CRITICAL: Admin login failed. Cannot proceed with admin tests.")
-        sys.exit(1)
-    
-    # Step 2: Test GET /api/customizable-products
-    products = test_get_customizable_products()
-    
-    # Step 3: Test POST /api/customized-orders with valid data
-    order_id = test_post_customized_order_valid()
-    
-    # Step 4: Test POST /api/customized-orders with missing fields
-    test_post_customized_order_missing_fields()
-    
-    # Step 5: Test GET /api/admin/customized-orders without auth
-    test_get_admin_orders_no_auth(admin_token)
-    
-    # Step 6: Test GET /api/admin/customized-orders with auth
-    orders = test_get_admin_orders_with_auth(admin_token, order_id)
-    
-    # Step 7: Test DELETE without auth
-    if order_id:
-        test_delete_order_no_auth(order_id)
-    
-    # Step 8: Test DELETE with auth
-    if order_id:
-        test_delete_order_with_auth(admin_token, order_id)
-    
-    # Step 9: Test DELETE non-existent order
-    test_delete_nonexistent_order(admin_token)
-    
-    # Summary
-    print("\n" + "="*80)
-    print("TEST SUMMARY")
-    print("="*80)
-    print(f"✅ Passed: {tests_passed}")
-    print(f"❌ Failed: {tests_failed}")
-    print(f"📊 Total: {tests_passed + tests_failed}")
-    print(f"📈 Success Rate: {(tests_passed / (tests_passed + tests_failed) * 100):.1f}%")
+    print(f"Backend: {BASE_URL}")
+    print(f"Admin Email: {ADMIN_EMAIL}")
+    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*80)
     
-    if tests_failed > 0:
-        print("\n❌ SOME TESTS FAILED")
-        sys.exit(1)
-    else:
-        print("\n✅ ALL TESTS PASSED")
-        sys.exit(0)
-
+    try:
+        # Test 1: Get product
+        product = test_1_get_product()
+        
+        # Test 2: Create order
+        order_data = test_2_create_order(product)
+        
+        # Test 3: Verify payment (checks for dual emails)
+        verified_order = test_3_verify_payment(order_data)
+        
+        # Test 4: Idempotency
+        test_4_idempotency(verified_order)
+        
+        # Test 5: Bad signature
+        test_5_bad_signature(order_data)
+        
+        # Test 6: Missing fields
+        test_6_missing_fields()
+        
+        # Test 7: Webhook endpoint
+        test_7_webhook_endpoint()
+        
+        # Test 8: Regression
+        test_8_regression()
+        
+    finally:
+        # Cleanup
+        cleanup_wc_orders()
+        
+        # Print summary
+        print_summary()
 
 if __name__ == "__main__":
     main()

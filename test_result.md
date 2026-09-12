@@ -109,6 +109,24 @@ user_problem_statement: |
   3) Add/update/delete up to 5 hero banner images; only existing images are shown on the homepage.
 
 backend:
+  - task: "Razorpay payment confirmation + dual emails (customer + owner) + webhook"
+    implemented: true
+    working: true
+    file: "api/index.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: false
+          agent: "user"
+          comment: "USER BUG REPORT: When a user made a Razorpay payment, it did not confirm the payment and no emails were sent to the customer or the admin. Expected: once payment is done, confirm it and send email to both customer and owner."
+        - working: "NA"
+          agent: "main"
+          comment: "Fixes in /app/api/index.js: (1) Dedicated OWNER notification email (adminOrderEmailHtml) now sent to ADMIN_EMAIL on every paid order, independent of customer email — previously owner was only CC'd on the customer email, and got nothing if billing email was missing. (2) sendMail now supports cc:null to skip default owner CC. (3) /api/orders no longer 500s if Razorpay order creation fails — returns the unpaid WC order so frontend shows 'payment gateway unavailable'. (4) Extracted shared confirmPaidOrder() — idempotent via MongoDB paid_orders marker (dedupes duplicate confirm calls so no duplicate emails; WC PUT always re-run to self-heal). (5) NEW POST /api/payments/webhook (raw-body HMAC validation with RAZORPAY_WEBHOOK_SECRET, handles payment.captured, resolves wc_order_id from Razorpay order notes) — safety net if browser closes before frontend verify. Webhook needs RAZORPAY_WEBHOOK_SECRET env + Razorpay dashboard config (user action). Smoke-tested via curl: verify confirms order + sends BOTH emails, duplicate verify sends NO duplicate emails, bad signature 400, webhook without secret returns 500. NOTE: a real Razorpay checkout payment cannot be completed programmatically — testing agent should verify the verify/webhook endpoints with fabricated-but-valid HMAC signatures (same method: HMAC_SHA256 of '<razorpay_order_id>|<payment_id>' with RAZORPAY_KEY_SECRET)."
+        - working: true
+          agent: "testing"
+          comment: "✅ ALL 10 RAZORPAY PAYMENT TESTS PASSED (100% SUCCESS RATE). Comprehensive testing completed for payment confirmation + dual emails + webhook. TEST 1 - GET /api/products: ✅ Retrieved real product from WooCommerce (Theme T-shirt #47, ₹5). TEST 2 - POST /api/orders: ✅ Successfully created WC order #56 with Razorpay order (order_TbCA9CXnK1sVZr, amount 500 paise). Response includes razorpay_order_id (starts with 'order_'), razorpay_key_id, and razorpay_amount as expected. TEST 3 - POST /api/payments/verify (CORE BUG FIX): ✅ Payment verification with fabricated-but-valid HMAC SHA256 signature successful. Order #56 marked as paid with status 'processing'. **DUAL EMAILS CONFIRMED**: Backend logs show 2 'Email sent:' lines - one to customer (test-1789231327@example.com) and one to owner (hello@sojaru.co.in). This confirms the bug fix is working - both customer AND owner receive email notifications on payment confirmation. TEST 4 - IDEMPOTENCY: ✅ Repeated the exact same verify call with same razorpay_order_id/payment_id/signature. Response returned 200 with paid=true, but NO new 'Email sent:' lines appeared in logs. Idempotency working correctly - duplicate confirmations do not resend emails. TEST 5 - BAD SIGNATURE: ✅ Called verify with invalid signature 'invalid_signature_12345'. Correctly rejected with 400 'Payment verification failed'. TEST 6 - MISSING FIELDS: ✅ Called verify without razorpay_signature field. Correctly rejected with 400 'Missing payment verification fields'. TEST 7 - WEBHOOK ENDPOINT: ✅ POST /api/payments/webhook with empty JSON body correctly returns 500 'Webhook not configured' (RAZORPAY_WEBHOOK_SECRET not set in .env, as expected - user needs to configure this in Razorpay dashboard). Endpoint exists and rejects gracefully. TEST 8 - REGRESSION: ✅ GET /api/settings returns 200 with hero and marquee_texts. ✅ GET /api/categories returns 200 with 19 categories. ✅ POST /api/auth/login with hello@sojaru.co.in/admin123 returns 200 with token and is_admin=true. CLEANUP: ✅ Test WC order #56 deleted successfully. CONCLUSION: The user-reported bug is FIXED. Payment confirmation now sends BOTH customer and owner emails as required. All payment flows working correctly with proper validation, idempotency, and error handling."
+
   - task: "Customization feature - 4 new endpoints for customizable products and orders"
     implemented: true
     working: true
@@ -261,12 +279,47 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Razorpay payment confirmation + dual emails (customer + owner) + webhook"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
+    -agent: "testing"
+    -message: |
+      ✅ RAZORPAY PAYMENT CONFIRMATION + DUAL EMAILS TESTING COMPLETE - ALL 10 TESTS PASSED (100%)
+      
+      Tested the Razorpay payment flow end-to-end at http://localhost:8001 with fabricated-but-valid HMAC signatures.
+      
+      CORE BUG FIX VERIFIED: ✅ DUAL EMAILS WORKING
+      - When payment is confirmed via POST /api/payments/verify, backend sends TWO separate emails:
+        1. Customer confirmation email → test-1789231327@example.com (billing email from order)
+        2. Owner notification email → hello@sojaru.co.in (ADMIN_EMAIL from .env)
+      - Backend logs confirm: "Email sent: <messageId> -> test-1789231327@example.com" followed by "Email sent: <messageId> -> hello@sojaru.co.in"
+      - This fixes the user-reported bug where no emails were sent to customer or owner after payment
+      
+      PAYMENT FLOW TESTS (7/7 passed):
+      1. ✅ POST /api/orders creates WC order + Razorpay order with valid razorpay_order_id (order_...), razorpay_key_id, razorpay_amount
+      2. ✅ POST /api/payments/verify with valid HMAC SHA256 signature confirms payment, marks order as paid (status: processing), sends BOTH emails
+      3. ✅ IDEMPOTENCY: Duplicate verify call returns 200 but sends NO duplicate emails (paid_orders MongoDB marker working)
+      4. ✅ BAD SIGNATURE: Invalid signature correctly rejected with 400 "Payment verification failed"
+      5. ✅ MISSING FIELDS: Missing razorpay_signature correctly rejected with 400 "Missing payment verification fields"
+      6. ✅ WEBHOOK ENDPOINT: POST /api/payments/webhook returns 500 "Webhook not configured" (RAZORPAY_WEBHOOK_SECRET not set, as expected)
+      7. ✅ CLEANUP: Test WC order #56 deleted successfully via WooCommerce API
+      
+      REGRESSION TESTS (3/3 passed):
+      - ✅ GET /api/settings returns 200 with hero and marquee_texts
+      - ✅ GET /api/categories returns 200 with 19 categories
+      - ✅ Admin login (hello@sojaru.co.in / admin123) returns 200 with token and is_admin=true
+      
+      TECHNICAL NOTES:
+      - Used HMAC SHA256 to fabricate valid Razorpay signatures: hmac_sha256(razorpay_order_id + "|" + payment_id, RAZORPAY_KEY_SECRET)
+      - Verified email sending by checking backend logs (/var/log/supervisor/backend.out.log) for "Email sent:" lines
+      - confirmPaidOrder() function correctly implements idempotency via MongoDB paid_orders collection
+      - sendOrderEmails() sends two independent emails: orderEmailHtml (customer) and adminOrderEmailHtml (owner)
+      
+      CONCLUSION: User-reported bug is FIXED. Payment confirmation now sends emails to BOTH customer and owner as required. All payment flows working correctly.
     -agent: "main"
     -message: |
       ENV SETUP (2026-09-12): User provided production env vars; configured the full stack.
