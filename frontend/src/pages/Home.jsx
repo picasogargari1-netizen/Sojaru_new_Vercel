@@ -334,24 +334,6 @@ function WorldsSection() {
   );
 }
 
-// ─── 3b. WARM ITALIC MARQUEE (after hero, like hyppy.in) ──────────────────────
-function WarmMarquee() {
-  return (
-    <div className="overflow-hidden bg-softyellow py-3 border-y border-border">
-      <div className="flex whitespace-nowrap animate-marquee">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span
-            key={i}
-            className="mx-8 font-display text-sm italic text-ink/55"
-          >
-            welcome home ✿ come on in ✿ stay a while
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ─── 4. CATEGORY BENTO GRID (text overlay, landscape, varying col spans) ──────
 const BENTO_SPANS = [2, 2, 1, 2, 1, 2, 2, 3, 2, 3, 2, 2, 1];
 
@@ -540,7 +522,6 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <WarmMarquee />
       <CustomizeSection />
 
       <FestiveSection />

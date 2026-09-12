@@ -37,6 +37,7 @@ export const store = {
       .catch(() => ({ currency_code: "INR", currency_symbol: "₹" })),
   categories: () => client.get("/categories").then((r) => asArray(r.data)).catch(() => []),
   customizableProducts: () => client.get("/customizable-products").then((r) => asArray(r.data)).catch(() => []),
+  contact: (payload) => client.post("/contact", payload).then((r) => r.data),
   settings: () =>
     client
       .get("/settings")

@@ -119,6 +119,23 @@ function tempPasswordEmailHtml({ name, tempPassword }) {
   `, "Sign In");
 }
 
+// Contact form message → forwarded to the store owner (reply-to = the visitor)
+function contactEmailHtml({ name, email, message }) {
+  const line = (label, val) => `<tr>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:12px;color:#8a837c;text-transform:uppercase;letter-spacing:1px;width:110px;vertical-align:top;">${label}</td>
+      <td style="padding:9px 4px;border-bottom:1px solid ${BRAND.accent};font-size:14px;color:${BRAND.ink};">${esc(val)}</td>
+    </tr>`;
+  return emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:${BRAND.ink};">New message from ${esc(name)} 💌</h1>
+    <p style="margin:0 0 22px;color:#6b6560;font-size:14px;line-height:1.6;">Someone reached out via the Contact Us page on sojaru.co.in. Hit reply to respond to them directly.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      ${line("Name", name)}
+      ${line("Email", email)}
+      ${line("Message", message)}
+    </table>
+  `, "Visit Store");
+}
+
 function adminOrderEmailHtml({ order, paymentId }) {
   const b = order.billing || {};
   const s = order.shipping || {};
@@ -191,10 +208,11 @@ function customizationEmailHtml({ name, product_type, size, color, material, add
 // Awaitable + never-throws. Must be awaited before sending the HTTP response so it
 // reliably runs on Vercel serverless (functions can freeze right after the response).
 // By default CCs the owner (SMTP_FROM); pass cc: null to skip the CC.
-function sendMail({ to, subject, html, cc }) {
+// replyTo defaults to the owner; pass the sender's address so the owner can reply directly.
+function sendMail({ to, subject, html, cc, replyTo }) {
   const t = getTransporter();
   if (!t || !to) { if (!t) console.warn("SMTP not configured; skipping email to", to); return Promise.resolve(); }
-  const msg = { from: `Sojaru <${SMTP_FROM}>`, to, replyTo: SMTP_FROM, subject, html };
+  const msg = { from: `Sojaru <${SMTP_FROM}>`, to, replyTo: replyTo || SMTP_FROM, subject, html };
   if (cc !== null) msg.cc = cc || SMTP_FROM;
   return t.sendMail(msg)
     .then((info) => console.log("Email sent:", info.messageId, "->", to))
@@ -669,6 +687,25 @@ app.post("/api/auth/forgot-password", wrap(async (req, res) => {
     html: tempPasswordEmailHtml({ name: user.first_name || "", tempPassword }),
   });
   res.json(generic);
+}));
+
+// Contact form (public) — forwards the visitor's message to the store owner.
+// From: hello@sojaru.co.in, To: hello@sojaru.co.in, Reply-To: the visitor's email.
+app.post("/api/contact", wrap(async (req, res) => {
+  const { name, email, message } = req.body || {};
+  if (!name || !String(name).trim() || !email || !String(email).trim() || !message || !String(message).trim()) {
+    const e = new Error("Name, email and message are required"); e.status = 400; throw e;
+  }
+  if (!/.+@.+\..+/.test(String(email).trim())) { const e = new Error("Please enter a valid email address"); e.status = 400; throw e; }
+  if (!SMTP_FROM) { const e = new Error("Contact form is not configured"); e.status = 500; throw e; }
+  await sendMail({
+    to: SMTP_FROM,
+    cc: null, // already going to the owner — no CC needed
+    replyTo: String(email).trim(),
+    subject: `New contact message from ${String(name).trim()} — Sojaru`,
+    html: contactEmailHtml({ name: String(name).trim(), email: String(email).trim(), message: String(message).trim() }),
+  });
+  res.json({ ok: true });
 }));
 
 // Update profile

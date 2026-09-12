@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { PawPrint, Mail, MapPin, Instagram } from "lucide-react";
+import { PawPrint, Mail, MapPin, Phone, Loader2 } from "lucide-react";
+import { store, apiErr } from "@/lib/api";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,19 +89,30 @@ const CONTENT = {
 
 function ContactForm() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
-  const submit = (e) => { e.preventDefault(); toast.success("Message sent!", { description: "We'll get back to you within 1–2 business days." }); setForm({ name: "", email: "", message: "" }); };
+  const [sending, setSending] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setSending(true);
+    try {
+      await store.contact(form);
+      toast.success("Message sent!", { description: "We'll get back to you within 1–2 business days." });
+      setForm({ name: "", email: "", message: "" });
+    } catch (err) {
+      toast.error(apiErr(err, "Could not send your message. Please try again."));
+    } finally { setSending(false); }
+  };
   return (
     <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
       <form onSubmit={submit} className="space-y-4">
         <div><Label>Name</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="contact-name" /></div>
         <div><Label>Email</Label><Input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="contact-email" /></div>
         <div><Label>Message</Label><Textarea required rows={5} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="contact-message" /></div>
-        <Button type="submit" className="rounded-full bg-ink text-cream hover:bg-terracotta" data-testid="contact-submit">Send message</Button>
+        <Button type="submit" disabled={sending} className="rounded-full bg-ink text-cream hover:bg-terracotta" data-testid="contact-submit">{sending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending…</> : "Send message"}</Button>
       </form>
-      <div className="space-y-5 rounded-2xl bg-oat/60 p-7">
+      <div className="space-y-5 rounded-2xl bg-oat/60 p-7" data-testid="reach-the-pack">
         <h3 className="font-display text-2xl text-ink">Reach the pack</h3>
         <p className="flex items-center gap-3 text-sm text-ink/80"><Mail className="h-5 w-5 text-terracotta" /> hello@sojaru.co.in</p>
-        <p className="flex items-center gap-3 text-sm text-ink/80"><Instagram className="h-5 w-5 text-terracotta" /> @sojaru</p>
+        <p className="flex items-center gap-3 text-sm text-ink/80"><Phone className="h-5 w-5 text-terracotta" /> <a href="tel:+919477909496" className="hover:text-terracotta">+91 94779 09496</a></p>
         <p className="flex items-center gap-3 text-sm text-ink/80"><MapPin className="h-5 w-5 text-terracotta" /> Shipping across India</p>
         <p className="text-sm text-muted-foreground">Whether it's a question about sizing, an engraving request, or you just want to share a photo of your best friend — we're all ears.</p>
       </div>
