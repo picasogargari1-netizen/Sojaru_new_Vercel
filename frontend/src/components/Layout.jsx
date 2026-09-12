@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CartDrawer } from "@/components/CartDrawer";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 export function Layout() {
   const { pathname } = useLocation();
@@ -15,6 +16,7 @@ export function Layout() {
       </main>
       <Footer />
       <CartDrawer />
+      <WhatsAppButton />
     </div>
   );
 }
