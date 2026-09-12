@@ -243,6 +243,10 @@ function CustomizeSection() {
             <Button type="submit" disabled={submitting} data-testid="cf-submit" className="mt-3 h-10 w-full rounded-none bg-cream text-xs font-bold uppercase tracking-widest text-ink hover:bg-yellow hover:text-ink">
               {submitting ? <><Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> Sending…</> : "Submit request"}
             </Button>
+            <p className="mt-4 text-center text-xs leading-relaxed text-cream/80" data-testid="cf-contact-note">
+              Have a question? We'd love to hear from you. Reach out to us at{" "}
+              <a href="tel:+919477909496" className="font-semibold text-cream underline underline-offset-2 hover:text-yellow">+91 94779 09496</a>
+            </p>
           </form>
       </div>
     </section>
