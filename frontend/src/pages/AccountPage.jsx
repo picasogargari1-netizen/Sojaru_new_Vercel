@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Loader2, Package, User as UserIcon, MapPin, LogOut, PawPrint, LayoutDashboard } from "lucide-react";
+import { Loader2, Package, User as UserIcon, MapPin, LogOut, PawPrint, LayoutDashboard, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { auth as authApi, apiErr } from "@/lib/api";
@@ -77,6 +77,31 @@ function Profile() {
   );
 }
 
+function ChangePassword() {
+  const [form, setForm] = useState({ current_password: "", new_password: "", confirm_password: "" });
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    if (!form.current_password || !form.new_password) { toast.error("Please fill in all fields."); return; }
+    if (form.new_password.length < 6) { toast.error("New password must be at least 6 characters."); return; }
+    if (form.new_password !== form.confirm_password) { toast.error("New passwords do not match."); return; }
+    setSaving(true);
+    try {
+      await authApi.changePassword({ current_password: form.current_password, new_password: form.new_password });
+      toast.success("Password updated successfully");
+      setForm({ current_password: "", new_password: "", confirm_password: "" });
+    } catch (e) { toast.error(apiErr(e, "Could not change password")); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="max-w-md space-y-4" data-testid="change-password-form">
+      <div><Label>Current password</Label><Input type="password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="cp-current" /></div>
+      <div><Label>New password</Label><Input type="password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="cp-new" /></div>
+      <div><Label>Confirm new password</Label><Input type="password" value={form.confirm_password} onChange={(e) => setForm({ ...form, confirm_password: e.target.value })} className="mt-1.5 rounded-xl bg-cream" data-testid="cp-confirm" /></div>
+      <Button onClick={save} disabled={saving} className="rounded-full bg-ink text-cream hover:bg-terracotta" data-testid="cp-save">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Update password"}</Button>
+    </div>
+  );
+}
+
 function Addresses() {
   const { user, setUser } = useAuth();
   const b = user?.billing || {};
@@ -129,14 +154,16 @@ export default function AccountPage() {
       </div>
 
       <Tabs defaultValue="orders" className="mt-8">
-        <TabsList className="mb-6 rounded-full bg-oat p-1">
+        <TabsList className="mb-6 flex h-auto flex-wrap gap-1 rounded-full bg-oat p-1">
           <TabsTrigger value="orders" className="rounded-full data-[state=active]:bg-cream" data-testid="tab-orders"><Package className="mr-2 h-4 w-4" /> Orders</TabsTrigger>
           <TabsTrigger value="profile" className="rounded-full data-[state=active]:bg-cream" data-testid="tab-profile"><UserIcon className="mr-2 h-4 w-4" /> Profile</TabsTrigger>
           <TabsTrigger value="addresses" className="rounded-full data-[state=active]:bg-cream" data-testid="tab-addresses"><MapPin className="mr-2 h-4 w-4" /> Addresses</TabsTrigger>
+          <TabsTrigger value="password" className="rounded-full data-[state=active]:bg-cream" data-testid="tab-password"><Lock className="mr-2 h-4 w-4" /> Password</TabsTrigger>
         </TabsList>
         <TabsContent value="orders"><Orders /></TabsContent>
         <TabsContent value="profile"><Profile /></TabsContent>
         <TabsContent value="addresses"><Addresses /></TabsContent>
+        <TabsContent value="password"><ChangePassword /></TabsContent>
       </Tabs>
     </div>
   );

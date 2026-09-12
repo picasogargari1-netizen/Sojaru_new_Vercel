@@ -105,7 +105,20 @@ function emailShell(inner, buttonLabel) {
   </body></html>`;
 }
 
-// Owner/admin notification for a paid order — independent of the customer email
+// Temporary password email (forgot-password flow)
+function tempPasswordEmailHtml({ name, tempPassword }) {
+  return emailShell(`
+    <h1 style="margin:0 0 8px;font-size:22px;font-weight:bold;color:${BRAND.ink};">Your temporary password${name ? ", " + esc(name) : ""} 🔑</h1>
+    <p style="margin:0 0 22px;color:#6b6560;font-size:14px;line-height:1.6;">We received a request to reset your Sojaru password. Use the temporary password below to sign in, then change it from your account for security.</p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+      <tr><td align="center" style="padding:18px;background:${BRAND.soft};border:1px dashed ${BRAND.accent};">
+        <span style="font-family:'Courier New',monospace;font-size:22px;font-weight:bold;letter-spacing:2px;color:${BRAND.ink};">${esc(tempPassword)}</span>
+      </td></tr>
+    </table>
+    <p style="margin:18px 0 0;color:#6b6560;font-size:13px;line-height:1.6;">If you didn't request this, you can safely ignore this email — but consider changing your password if you're concerned.</p>
+  `, "Sign In");
+}
+
 function adminOrderEmailHtml({ order, paymentId }) {
   const b = order.billing || {};
   const s = order.shipping || {};
@@ -621,6 +634,42 @@ app.post("/api/auth/login", wrap(async (req, res) => {
 
 // Me
 app.get("/api/auth/me", wrap(async (req, res) => { res.json(await getCurrentUser(req)); }));
+
+// Change password (authenticated)
+app.post("/api/auth/change-password", wrap(async (req, res) => {
+  const user = await getCurrentUser(req);
+  const { current_password, new_password } = req.body || {};
+  if (!current_password || !new_password) { const e = new Error("Current and new password are required"); e.status = 400; throw e; }
+  if (String(new_password).length < 6) { const e = new Error("New password must be at least 6 characters"); e.status = 400; throw e; }
+  const db = await getDb();
+  const row = await db.collection("users").findOne({ _id: new ObjectId(user.id) }, { projection: { password_hash: 1 } });
+  if (!row || !(await checkPw(current_password, row.password_hash))) { const e = new Error("Your current password is incorrect"); e.status = 400; throw e; }
+  await db.collection("users").updateOne({ _id: new ObjectId(user.id) }, { $set: { password_hash: await hashPw(new_password) } });
+  res.json({ ok: true });
+}));
+
+// Forgot password (public) — emails a temporary password if the account exists.
+// Always returns the same generic message so email addresses can't be probed.
+app.post("/api/auth/forgot-password", wrap(async (req, res) => {
+  const email = String((req.body && req.body.email) || "").trim().toLowerCase();
+  const generic = { ok: true, message: "If an account with that email exists, a temporary password has been sent to it." };
+  if (!email) { const e = new Error("Email is required"); e.status = 400; throw e; }
+  const db = await getDb();
+  const user = await db.collection("users").findOne({ email }, { projection: { _id: 1, first_name: 1 } });
+  if (!user) return res.json(generic); // don't reveal non-existence
+
+  // Generate a readable temporary password and set it as the account password
+  const tempPassword = `Sojaru-${crypto.randomBytes(4).toString("hex")}`;
+  await db.collection("users").updateOne({ _id: user._id }, { $set: { password_hash: await hashPw(tempPassword) } });
+
+  await sendMail({
+    to: email,
+    cc: null,
+    subject: "Your Sojaru temporary password 🔑",
+    html: tempPasswordEmailHtml({ name: user.first_name || "", tempPassword }),
+  });
+  res.json(generic);
+}));
 
 // Update profile
 app.put("/api/account/profile", wrap(async (req, res) => {

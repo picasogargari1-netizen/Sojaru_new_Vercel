@@ -93,6 +93,8 @@ export const auth = {
   me: () => client.get("/auth/me").then((r) => r.data),
   myOrders: () => client.get("/account/orders").then((r) => r.data),
   updateProfile: (payload) => client.put("/account/profile", payload).then((r) => r.data),
+  changePassword: (payload) => client.post("/auth/change-password", payload).then((r) => r.data),
+  forgotPassword: (email) => client.post("/auth/forgot-password", { email }).then((r) => r.data),
 };
 
 export default client;
