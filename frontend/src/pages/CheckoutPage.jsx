@@ -34,7 +34,7 @@ function loadRazorpayScript() {
 export default function CheckoutPage() {
   usePageMeta({ title: "Checkout — Sojaru" });
   const { items, subtotal, clear } = useCart();
-  const { money } = useStore();
+  const { money, delivery } = useStore();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -58,7 +58,7 @@ export default function CheckoutPage() {
     if (applied.discount_type === "percent") return (subtotal * amt) / 100;
     return Math.min(amt, subtotal);
   })();
-  const shipping = subtotal >= 1499 || subtotal === 0 ? 0 : 99;
+  const shipping = subtotal >= delivery.free_above || subtotal === 0 ? 0 : delivery.fee;
   const total = Math.max(0, subtotal - discount) + shipping;
 
   const applyCoupon = async () => {

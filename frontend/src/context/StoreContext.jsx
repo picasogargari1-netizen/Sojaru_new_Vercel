@@ -46,9 +46,14 @@ export function StoreProvider({ children }) {
   const childrenOf = (id) => catList.filter((c) => c.parent === id);
   const bySlug = (slug) => catList.find((c) => c.slug === slug);
 
+  const delivery = {
+    free_above: Number(settings?.delivery?.free_above ?? 1499),
+    fee: Number(settings?.delivery?.fee ?? 99),
+  };
+
   return (
     <StoreContext.Provider
-      value={{ symbol, money, categories, loaded, forYou, forPet, childrenOf, bySlug, settings, reloadSettings }}
+      value={{ symbol, money, categories, loaded, forYou, forPet, childrenOf, bySlug, settings, reloadSettings, delivery }}
     >
       {children}
     </StoreContext.Provider>

@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/context/CartContext";
 import { useStore } from "@/context/StoreContext";
 
-const FREE_SHIP = 1499;
-
 export function CartDrawer() {
   const { items, open, setOpen, removeItem, updateQty, subtotal, count } = useCart();
-  const { money } = useStore();
+  const { money, delivery } = useStore();
   const navigate = useNavigate();
+  const FREE_SHIP = delivery.free_above;
   const remaining = Math.max(0, FREE_SHIP - subtotal);
   const pct = Math.min(100, (subtotal / FREE_SHIP) * 100);
 

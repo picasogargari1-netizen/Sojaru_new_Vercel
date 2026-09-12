@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package, ClipboardList, Paperclip } from "lucide-react";
+import { Loader2, Upload, Trash2, Plus, X, LogOut, Image as ImageIcon, Type, Sparkles, LayoutTemplate, Grid3x3, Pencil, Check, Package, ClipboardList, Paperclip, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { useStore } from "@/context/StoreContext";
@@ -41,8 +41,7 @@ function HeroManager() {
 
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Up to 5 images. They auto-slide on the homepage hero.</p>
+      <div className="flex items-center justify-end">
         <span className="font-mono text-sm font-bold">{images.length}/5</span>
       </div>
       <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -83,7 +82,6 @@ function MarqueeManager() {
 
   return (
     <div>
-      <p className="text-sm text-muted-foreground">These lines scroll in the bar above the header.</p>
       <div className="mt-5 space-y-3">
         {texts.map((t, i) => (
           <div key={i} className="flex items-center gap-2">
@@ -124,7 +122,6 @@ function FestiveManager() {
 
   return (
     <div className="max-w-lg space-y-5">
-      <p className="text-sm text-muted-foreground">A single highlighted collection card shown below the hero banner. Its products always come from your WooCommerce <span className="font-bold text-ink">{'"Festive Collections"'}</span> category — tag products to that category in WooCommerce to feature them here. You can rename the card title any time.</p>
       <div>
         <Label>Card title</Label>
         <Input value={festive.title} onChange={(e) => setFestive({ ...festive, title: e.target.value })} placeholder="e.g. Diwali Edit, Holiday Gifting" className="mt-1.5 rounded-none border-2 border-ink bg-cream" data-testid="festive-title-input" />
@@ -156,7 +153,6 @@ function HeroTextManager() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <p className="text-sm text-muted-foreground">Edit the text shown on the homepage hero banner.</p>
       <div>
         <Label>Hero text</Label>
         <Textarea value={subtitle} onChange={(e) => setSubtitle(e.target.value)} rows={3} placeholder="Boldly designed everyday goods…" className="mt-1.5 rounded-none border-2 border-ink bg-cream" data-testid="hero-subtitle-input" />
@@ -213,11 +209,6 @@ function CategoryImagesManager() {
 
   return (
     <div>
-      <p className="text-sm text-muted-foreground">
-        Upload a custom <strong>landscape image (4:3 ratio recommended)</strong> for each sub-category.
-        New sub-categories added in WooCommerce appear here automatically.
-        Images are served at highest priority over WooCommerce images.
-      </p>
       <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {allCats.map((cat) => {
           const adminImg = adminCatImages[cat.slug];
@@ -347,10 +338,7 @@ function CustomizableProductsManager() {
 
   return (
     <div data-testid="customizable-products-manager">
-      <div className="mb-5 flex items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">
-          Manage the list of products that can be customised — shown to customers as reference.
-        </p>
+      <div className="mb-5 flex items-center justify-end gap-4">
         {editId !== "new" && (
           <Button
             onClick={startAdd}
@@ -502,7 +490,6 @@ function CustomizedOrdersManager() {
 
   return (
     <div data-testid="customized-orders-manager">
-      <p className="mb-5 text-sm text-muted-foreground">Customization requests submitted from the homepage form.</p>
       <div className="overflow-x-auto border-2 border-ink">
         <table className="w-full min-w-[1100px] text-sm">
           <thead className="bg-ink text-cream">
@@ -553,6 +540,64 @@ function CustomizedOrdersManager() {
   );
 }
 
+function DeliveryManager() {
+  const { settings, reloadSettings } = useStore();
+  const [freeAbove, setFreeAbove] = useState("");
+  const [fee, setFee] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (settings?.delivery) {
+      setFreeAbove(String(settings.delivery.free_above ?? ""));
+      setFee(String(settings.delivery.fee ?? ""));
+    }
+  }, [settings]);
+
+  const save = async () => {
+    const fa = Number(freeAbove), fe = Number(fee);
+    if (!Number.isFinite(fa) || fa < 0 || !Number.isFinite(fe) || fe < 0) {
+      toast.error("Please enter valid non-negative amounts");
+      return;
+    }
+    setSaving(true);
+    try {
+      await admin.updateSettings({ delivery: { free_above: fa, fee: fe } });
+      await reloadSettings();
+      toast.success("Delivery fee updated");
+    } catch (err) { toast.error(apiErr(err)); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="max-w-lg space-y-5" data-testid="delivery-manager">
+      <div>
+        <Label>Free delivery above (₹)</Label>
+        <Input
+          type="number" min="0" value={freeAbove}
+          onChange={(e) => setFreeAbove(e.target.value)}
+          placeholder="e.g. 1499"
+          className="mt-1.5 rounded-none border-2 border-ink bg-cream"
+          data-testid="delivery-free-above-input"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Orders at or above this cart value get free delivery.</p>
+      </div>
+      <div>
+        <Label>Delivery fee (₹)</Label>
+        <Input
+          type="number" min="0" value={fee}
+          onChange={(e) => setFee(e.target.value)}
+          placeholder="e.g. 99"
+          className="mt-1.5 rounded-none border-2 border-ink bg-cream"
+          data-testid="delivery-fee-input"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Charged when the cart is below the free-delivery value.</p>
+      </div>
+      <Button onClick={save} disabled={saving} className="rounded-none bg-ink font-bold uppercase text-cream hover:bg-yellow hover:text-ink" data-testid="delivery-save">
+        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save delivery fee"}
+      </Button>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   usePageMeta({ title: "Admin Dashboard — Sojaru" });
   const { user, ready, logout } = useAuth();
@@ -579,6 +624,7 @@ export default function AdminDashboard() {
           <TabsTrigger value="categories" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-categories"><Grid3x3 className="mr-2 h-4 w-4" /> Category Images</TabsTrigger>
           <TabsTrigger value="customizable" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-customizable"><Package className="mr-2 h-4 w-4" /> Customizable Products</TabsTrigger>
           <TabsTrigger value="customized-orders" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-customized-orders"><ClipboardList className="mr-2 h-4 w-4" /> Customized Orders</TabsTrigger>
+          <TabsTrigger value="delivery" className="rounded-none border-2 border-ink data-[state=active]:bg-yellow" data-testid="admin-tab-delivery"><Truck className="mr-2 h-4 w-4" /> Delivery Fee</TabsTrigger>
         </TabsList>
         <TabsContent value="hero"><HeroManager /></TabsContent>
         <TabsContent value="herotext"><HeroTextManager /></TabsContent>
@@ -587,6 +633,7 @@ export default function AdminDashboard() {
         <TabsContent value="categories"><CategoryImagesManager /></TabsContent>
         <TabsContent value="customizable"><CustomizableProductsManager /></TabsContent>
         <TabsContent value="customized-orders"><CustomizedOrdersManager /></TabsContent>
+        <TabsContent value="delivery"><DeliveryManager /></TabsContent>
       </Tabs>
     </div>
   );

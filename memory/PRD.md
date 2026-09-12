@@ -103,7 +103,15 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Two cards: "For You" (routes to /shop/for-you) and "For Your Pet" (routes to /shop/for-your-pet), each with distinct imagery and a "Shop Now" button.
 - FINALIZED and approved by user (2026-07). No further changes requested.
 
-## Razorpay Payment Integration (2026-06)
+## UPI/Wallets Trust Line (2026-06)
+- Added "Pay via UPI, cards & wallets" line under "Secured by Razorpay" in the checkout order summary (data-testid payment-methods-note).
+
+## Delivery Fee Config + Admin Mobile Fix (2026-06)
+- New admin tab "Delivery Fee" (DeliveryManager) with two configurable fields: "Free delivery above (₹)" (free-shipping threshold) and "Delivery fee (₹)" (charged below threshold). Saved to settings.delivery via PUT /api/admin/settings; exposed in GET /api/settings + publicSettings (defaults 1499/99).
+- StoreContext now exposes `delivery` {free_above, fee}. CheckoutPage shipping calc and CartDrawer free-ship progress read from it instead of hardcoded 1499/99. Razorpay charge reflects the configured shipping via WooCommerce shipping_lines.
+- Coupon codes intentionally NOT added — WooCommerce coupons remain the source (user decision).
+- Fixed admin mobile bug: removed the helper description paragraphs in every manager (Hero, Moving Text, Festive, Hero Text, Category Images, Customizable Products, Customized Orders) that overlapped the wrapped tab row and blocked taps. Tabs are now cleanly accessible.
+- Verified: backend GET/PUT delivery persists; admin Delivery Fee tab renders + prefills; frontend compiles clean.
 - Replaced the WooCommerce hosted "order-pay" checkout with a native Razorpay Checkout popup on the checkout page.
 - Flow: checkout form → POST /api/orders creates an UNPAID WooCommerce order + a Razorpay order (amount = WC total in paise, INR) → frontend opens Razorpay popup (checkout.js loaded dynamically) → on success POST /api/payments/verify does HMAC-SHA256 signature verification (order_id|payment_id with RAZORPAY_KEY_SECRET) → marks the WC order set_paid=true, status=processing, transaction_id=razorpay_payment_id → sends branded confirmation email → shows confirmation screen.
 - Order confirmation email now fires AFTER successful payment (moved out of order creation), so only paid orders get the email.

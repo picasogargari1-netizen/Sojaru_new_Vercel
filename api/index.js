@@ -251,6 +251,7 @@ const DEFAULT_MARQUEE = ["Free shipping over ₹1,499", "Curated for you & your 
 const DEFAULT_HERO = { subtitle: "Boldly designed everyday goods — for the humans who love hard and the pets who love harder. Made in India, for both of you.", primary_label: "Shop Now", primary_link: "/shop/for-you", secondary_label: "Shop For Your Pet", secondary_link: "/shop/for-your-pet" };
 const FESTIVE_SLUG = "festive-collections";
 const FESTIVE_FALLBACK_ID = 33;
+const DEFAULT_DELIVERY = { free_above: 1499, fee: 99 };
 
 async function getSettings() {
   const db = await getDb();
@@ -273,6 +274,10 @@ function publicSettings(doc) {
     marquee_texts: doc.marquee_texts || DEFAULT_MARQUEE,
     festive: { title: festive.title || "Festive Collection", category_id: festive.category_id || FESTIVE_FALLBACK_ID, category_slug: FESTIVE_SLUG, enabled: festive.enabled !== false },
     category_images: catImages,
+    delivery: {
+      free_above: Number(doc.delivery?.free_above ?? DEFAULT_DELIVERY.free_above),
+      fee: Number(doc.delivery?.fee ?? DEFAULT_DELIVERY.fee),
+    },
   };
 }
 
@@ -537,7 +542,7 @@ app.get("/api/settings", wrap(async (req, res) => {
 // Admin: update settings
 app.put("/api/admin/settings", wrap(async (req, res) => {
   await requireAdmin(req);
-  const { marquee_texts, festive, hero } = req.body;
+  const { marquee_texts, festive, hero, delivery } = req.body;
   const db = await getDb(); const upd = {};
   if (marquee_texts) upd.marquee_texts = marquee_texts.filter((t) => t?.trim()).map((t) => t.trim());
   if (hero) { const pick = (k, fb) => typeof hero[k] === "string" && hero[k].trim() ? hero[k].trim() : fb; upd.hero = { subtitle: pick("subtitle", DEFAULT_HERO.subtitle), primary_label: pick("primary_label", DEFAULT_HERO.primary_label), primary_link: pick("primary_link", DEFAULT_HERO.primary_link), secondary_label: pick("secondary_label", DEFAULT_HERO.secondary_label), secondary_link: pick("secondary_link", DEFAULT_HERO.secondary_link) }; }
@@ -545,6 +550,14 @@ app.put("/api/admin/settings", wrap(async (req, res) => {
     let catId = FESTIVE_FALLBACK_ID;
     try { const r = await wc("GET", "products/categories", { slug: FESTIVE_SLUG }); if (r.data.length) catId = r.data[0].id; } catch {}
     upd.festive = { title: (festive.title || "Festive Collection").trim(), category_id: catId, enabled: !!festive.enabled };
+  }
+  if (delivery) {
+    const freeAbove = Number(delivery.free_above);
+    const fee = Number(delivery.fee);
+    upd.delivery = {
+      free_above: Number.isFinite(freeAbove) && freeAbove >= 0 ? freeAbove : DEFAULT_DELIVERY.free_above,
+      fee: Number.isFinite(fee) && fee >= 0 ? fee : DEFAULT_DELIVERY.fee,
+    };
   }
   if (Object.keys(upd).length) await db.collection("settings").updateOne({ _id: "site" }, { $set: upd }, { upsert: true });
   res.json(publicSettings(await getSettings()));
