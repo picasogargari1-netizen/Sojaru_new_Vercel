@@ -38,6 +38,7 @@ const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_FROM = process.env.SMTP_FROM || SMTP_USER;
 
 let _transporter = null;
+let _transporterAlt = null;
 function getTransporter() {
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
   if (!_transporter) {
@@ -46,13 +47,35 @@ function getTransporter() {
       port: SMTP_PORT,
       secure: SMTP_PORT === 465, // 465 = implicit SSL; 587 = STARTTLS
       auth: { user: SMTP_USER, pass: SMTP_PASS },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
     });
   }
   return _transporter;
 }
+// STARTTLS 587 fallback — some hosts/serverless networks throttle or block 465
+function getTransporterAlt() {
+  if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  if (!_transporterAlt) {
+    _transporterAlt = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: 587,
+      secure: false,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      connectionTimeout: 8000,
+      greetingTimeout: 8000,
+      socketTimeout: 10000,
+    });
+  }
+  return _transporterAlt;
+}
+
+// Vercel's waitUntil keeps the function alive for background work after the
+// response is sent (emails). Not present when running standalone — then we just
+// let the persistent process finish the work after responding.
+let _waitUntil = null;
+try { _waitUntil = require("@vercel/functions").waitUntil; } catch {}
 
 // ─── Razorpay ─────────────────────────────────────────────────────────────────
 const Razorpay = require("razorpay");
@@ -215,6 +238,12 @@ function sendMail({ to, subject, html, cc, replyTo }) {
   const msg = { from: `Sojaru <${SMTP_FROM}>`, to, replyTo: replyTo || SMTP_FROM, subject, html };
   if (cc !== null) msg.cc = cc || SMTP_FROM;
   return t.sendMail(msg)
+    .catch((err) => {
+      const alt = SMTP_PORT !== 587 ? getTransporterAlt() : null;
+      if (!alt) throw err;
+      console.warn("Primary SMTP failed (" + err.message + ") — retrying", to, "via port 587");
+      return alt.sendMail(msg);
+    })
     .then((info) => console.log("Email sent:", info.messageId, "->", to))
     .catch((err) => console.error("Email send failed:", err.message));
 }
@@ -521,34 +550,37 @@ app.post("/api/orders", wrap(async (req, res) => {
 }));
 
 // ─── Payment confirmation (shared by checkout verify + Razorpay webhook) ─────
-// Sends BOTH the customer confirmation and the owner notification email.
+// Sends BOTH the customer confirmation and the owner notification email, in parallel.
 async function sendOrderEmails(o, paymentId) {
+  const jobs = [];
   // Customer confirmation
   const billingEmail = o.billing && o.billing.email ? String(o.billing.email).trim() : "";
   const billingName = o.billing ? [o.billing.first_name, o.billing.last_name].filter(Boolean).join(" ") : "";
   if (billingEmail) {
-    await sendMail({
+    jobs.push(sendMail({
       to: billingEmail,
       cc: null, // owner gets a dedicated notification below (no CC needed here)
       subject: `Your Sojaru order #${o.id} is confirmed 🐾`,
       html: orderEmailHtml({ name: billingName, orderId: o.id, total: o.total, currency: o.currency, items: o.line_items, status: o.status }),
-    });
+    }));
   }
   // Owner/admin notification — independent of the customer email
   const ownerEmail = (process.env.ADMIN_EMAIL || SMTP_FROM || "").trim();
   if (ownerEmail) {
-    await sendMail({
+    jobs.push(sendMail({
       to: ownerEmail,
       cc: null,
       subject: `New paid order #${o.id} — ${money(o.total, o.currency)}`,
       html: adminOrderEmailHtml({ order: o, paymentId }),
-    });
+    }));
   }
+  await Promise.all(jobs); // sendMail never throws
 }
 
-// Idempotently mark a WC order paid and send notification emails exactly once.
-// A `paid_orders` marker doc (keyed by wc order id) dedupes the checkout verify
-// call and the Razorpay webhook so the customer/owner never get duplicate emails.
+// Idempotently mark a WC order paid. A `paid_orders` marker doc (keyed by wc order id)
+// dedupes the checkout verify call and the Razorpay webhook so the customer/owner never
+// get duplicate emails. Email sending is the CALLER's job (only when !already), so the
+// HTTP response can be sent first and emails can finish in the background.
 async function confirmPaidOrder({ wcOrderId, paymentId, source }) {
   const db = await getDb();
   let already = false;
@@ -565,9 +597,7 @@ async function confirmPaidOrder({ wcOrderId, paymentId, source }) {
   const upd = await wc("PUT", `orders/${wcOrderId}`, null, {
     set_paid: true, status: "processing", transaction_id: paymentId || "",
   });
-  const o = upd.data;
-  if (!already) await sendOrderEmails(o, paymentId);
-  return { order: o, already };
+  return { order: upd.data, already };
 }
 
 // Verify a Razorpay payment and mark the WooCommerce order as paid
@@ -584,8 +614,13 @@ app.post("/api/payments/verify", wrap(async (req, res) => {
     const e = new Error("Payment verification failed"); e.status = 400; throw e;
   }
 
-  const { order: o } = await confirmPaidOrder({ wcOrderId: wc_order_id, paymentId: razorpay_payment_id, source: "checkout" });
+  const { order: o, already } = await confirmPaidOrder({ wcOrderId: wc_order_id, paymentId: razorpay_payment_id, source: "checkout" });
+  // Respond immediately so the customer sees confirmation fast; emails continue in the
+  // background (waitUntil keeps the Vercel function alive after the response).
+  const emailWork = already ? Promise.resolve() : sendOrderEmails(o, razorpay_payment_id);
+  if (_waitUntil) _waitUntil(emailWork);
   res.json({ id: o.id, status: o.status, total: o.total, currency: o.currency, paid: true });
+  await emailWork; // standalone servers: completes in-process; Vercel: covered by waitUntil
 }));
 
 // Razorpay webhook — safety net that confirms payment even if the customer's
@@ -619,7 +654,11 @@ app.post("/api/payments/webhook", wrap(async (req, res) => {
   if (!wcOrderId) return res.json({ ok: true, ignored: "no-wc-order-id" });
 
   const { order: o, already } = await confirmPaidOrder({ wcOrderId, paymentId: payment.id, source: "webhook" });
+  // Acknowledge Razorpay fast; emails continue in the background
+  const emailWork = already ? Promise.resolve() : sendOrderEmails(o, payment.id);
+  if (_waitUntil) _waitUntil(emailWork);
   res.json({ ok: true, wc_order_id: o.id, status: o.status, already_confirmed: already });
+  await emailWork;
 }));
 
 // Get order

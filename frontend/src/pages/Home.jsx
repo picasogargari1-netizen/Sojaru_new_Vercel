@@ -28,7 +28,7 @@ function Hero() {
 
   return (
     <section
-      className="relative overflow-hidden w-full aspect-[827/1600] sm:aspect-auto sm:h-[90vh] lg:h-[95vh]"
+      className="relative overflow-hidden w-full aspect-[4/5] sm:aspect-auto sm:h-[90vh] lg:h-[95vh]"
       data-testid="hero-section"
     >
       <div className="relative h-full w-full">
