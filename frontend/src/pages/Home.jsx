@@ -89,55 +89,63 @@ const EMPTY_FORM = { name: "", email: "", phone: "", product_type: "", size: "",
 // ─── Welcome Home banner (whimsical cottage + drifting chimney smoke) ─────────
 function WelcomeHome() {
   return (
-    <section className="bg-background px-6 py-10 sm:py-14" data-testid="welcome-home-section">
-      <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
+    <section className="bg-background px-6 py-6 sm:py-8" data-testid="welcome-home-section">
+      <div className="mx-auto flex max-w-xl flex-col items-center text-center">
         {/* Whimsical hand-drawn cottage with animated chimney smoke */}
-        <svg viewBox="0 0 160 140" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-24 w-auto sm:h-28" aria-hidden="true">
+        <svg viewBox="0 0 160 132" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-20 w-auto sm:h-24" aria-hidden="true">
+          <defs>
+            {/* scalloped shingle scales for the roof */}
+            <pattern id="roofScales" width="15" height="11" patternUnits="userSpaceOnUse">
+              <path d="M0 4 a7.5 7.5 0 0 0 15 0" fill="none" stroke="#b07248" strokeWidth="1.4" />
+            </pattern>
+          </defs>
+
           {/* Smoke curling up from the chimney */}
           <g stroke="#b3ab99" strokeWidth="2.6" strokeLinecap="round" fill="none">
-            <path className="smoke-puff" d="M55 34 q-7 -5 0 -11 q7 -5 0 -11" />
-            <path className="smoke-puff smoke-puff-2" d="M58 36 q-7 -5 0 -11 q7 -5 0 -11" />
-            <path className="smoke-puff smoke-puff-3" d="M52 37 q-7 -5 0 -11 q7 -5 0 -11" />
+            <path className="smoke-puff" d="M60 26 q-7 -5 0 -11 q7 -5 0 -11" />
+            <path className="smoke-puff smoke-puff-2" d="M63 28 q-7 -5 0 -11 q7 -5 0 -11" />
+            <path className="smoke-puff smoke-puff-3" d="M57 29 q-7 -5 0 -11 q7 -5 0 -11" />
           </g>
+
           {/* Chimney */}
-          <rect x="48" y="38" width="13" height="24" rx="3" fill="#d9a06b" />
-          <rect x="46" y="36" width="17" height="6" rx="3" fill="#c98a5e" />
-          {/* Right gable roof (green) */}
-          <path d="M104 62 L132 86 L104 86 Z" fill="#87a08b" />
-          {/* Main scalloped sage roof */}
-          <path d="M26 82 C26 56 50 44 78 44 C106 44 128 58 128 82
-                   q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0
-                   q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 q-4.7 7.5 -9.4 0 Z"
-                fill="#87a08b" />
-          {/* Terracotta scallop shingle accents */}
-          <path d="M34 70 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0"
-                fill="none" stroke="#c07a4a" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-          <path d="M46 58 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0 q4.7 7 9.4 0"
-                fill="none" stroke="#c07a4a" strokeWidth="2" strokeLinecap="round" opacity="0.55" />
-          {/* Gable tiny arched window */}
-          <path d="M112 78 v-4 a4 4 0 0 1 8 0 v4 z" fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.4" />
+          <rect x="54" y="28" width="10" height="24" rx="2.5" fill="#d9a06b" />
+          <rect x="52" y="26" width="14" height="5" rx="2.5" fill="#c98a5e" />
+
+          {/* Main sloped shingled roof (left) */}
+          <path d="M26 86 L56 46 L112 46 L112 86 Z" fill="#87a08b" />
+          <path d="M26 86 L56 46 L112 46 L112 86 Z" fill="url(#roofScales)" />
+
+          {/* Right gable: green roof edge over a peach triangular wall */}
+          <path d="M94 86 L117 33 L140 86 Z" fill="none" stroke="#87a08b" strokeWidth="7" strokeLinejoin="round" />
+          <path d="M98 86 L117 40 L136 86 Z" fill="#f0c092" />
+          {/* Gable arched window */}
+          <path d="M111 72 v-4 a6 6 0 0 1 12 0 v4 z" fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.6" />
+
           {/* Peach house body, rounded */}
-          <rect x="34" y="80" width="90" height="44" rx="9" fill="#f0c092" />
-          {/* Left arched window with cross panes */}
-          <path d="M44 106 v-9 a8 8 0 0 1 16 0 v9 z" fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.8" />
-          <line x1="52" y1="90" x2="52" y2="106" stroke="#c98a5e" strokeWidth="1.4" />
-          <line x1="44" y1="98" x2="60" y2="98" stroke="#c98a5e" strokeWidth="1.4" />
-          {/* Right arched window with cross panes */}
-          <path d="M96 106 v-9 a8 8 0 0 1 16 0 v9 z" fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.8" />
-          <line x1="104" y1="90" x2="104" y2="106" stroke="#c98a5e" strokeWidth="1.4" />
-          <line x1="96" y1="98" x2="112" y2="98" stroke="#c98a5e" strokeWidth="1.4" />
-          {/* Center arched door */}
-          <path d="M70 124 v-16 a9 9 0 0 1 18 0 v16 z" fill="#c98a5e" />
-          <circle cx="73.5" cy="113" r="1.6" fill="#7a5638" />
+          <rect x="30" y="84" width="106" height="42" rx="7" fill="#f0c092" />
+
+          {/* Two cross-pane windows */}
+          <g fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.7">
+            <rect x="44" y="94" width="18" height="18" rx="2" />
+            <rect x="74" y="94" width="18" height="18" rx="2" />
+          </g>
+          <g stroke="#c98a5e" strokeWidth="1.3">
+            <line x1="53" y1="94" x2="53" y2="112" /><line x1="44" y1="103" x2="62" y2="103" />
+            <line x1="83" y1="94" x2="83" y2="112" /><line x1="74" y1="103" x2="92" y2="103" />
+          </g>
+
+          {/* Arched door under the gable */}
+          <path d="M108 126 v-16 a9 9 0 0 1 18 0 v16 z" fill="#c98a5e" />
+          <circle cx="112" cy="114" r="1.6" fill="#7a5638" />
         </svg>
 
-        <h2 className="mt-4 font-display text-2xl italic text-ink sm:text-3xl">Hello, welcome home! :)</h2>
-        <p className="mt-3 text-base font-medium text-ink sm:text-lg">Got a design in mind? We&apos;ll bring it to life.</p>
-        <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ink/70">
+        <h2 className="mt-3 font-display text-xl italic text-ink sm:text-2xl">Hello, welcome home! :)</h2>
+        <p className="mt-2 text-sm font-medium text-ink sm:text-base">Got a design in mind? We&apos;ll bring it to life.</p>
+        <p className="mt-1 max-w-lg text-xs leading-relaxed text-ink/70 sm:text-sm">
           Customize your favourite T-shirts, hoodies, mugs, bottles, bags, posters, pet wear, stationery and more.
         </p>
-        <p className="mt-3 font-display text-lg italic text-terracotta">Your idea. Your style. Your product.</p>
-        <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-ink/70">
+        <p className="mt-2 font-display text-base italic text-terracotta">Your idea. Your style. Your product.</p>
+        <p className="mt-1 max-w-lg text-xs leading-relaxed text-ink/70 sm:text-sm">
           Share your design or simply tell us what you have in mind, and let&apos;s create something uniquely yours.
         </p>
       </div>
