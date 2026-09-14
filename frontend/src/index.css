@@ -90,3 +90,22 @@
     from { transform: translateX(0); }
     to { transform: translateX(-50%); }
 }
+
+/* Chimney smoke — three puffs drifting up and fading, staggered */
+.smoke-puff {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: smokeRise 4s ease-in-out infinite;
+    opacity: 0;
+}
+.smoke-puff-2 { animation-delay: 1.3s; }
+.smoke-puff-3 { animation-delay: 2.6s; }
+@keyframes smokeRise {
+    0%   { opacity: 0;   transform: translateY(0) translateX(0) scale(0.5); }
+    25%  { opacity: 0.6; }
+    60%  { opacity: 0.35; }
+    100% { opacity: 0;   transform: translateY(-26px) translateX(6px) scale(1.5); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .smoke-puff { animation: none; opacity: 0.4; }
+}

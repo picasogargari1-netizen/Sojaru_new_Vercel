@@ -86,6 +86,60 @@ function Hero() {
 const splitOpts = (s) => (s || "").split(",").map((x) => x.trim()).filter(Boolean);
 const EMPTY_FORM = { name: "", email: "", phone: "", product_type: "", size: "", color: "", material: "", additional_instructions: "" };
 
+// ─── Welcome Home banner (cottage + drifting chimney smoke) ───────────────────
+function WelcomeHome() {
+  return (
+    <section className="bg-background px-6 py-20 sm:py-24" data-testid="welcome-home-section">
+      <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+        {/* Cottage illustration with animated smoke */}
+        <svg width="150" height="150" viewBox="0 0 150 150" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-32 w-32 sm:h-36 sm:w-36" aria-hidden="true">
+          {/* Smoke puffs rising from the chimney */}
+          <g stroke="#9a9384" strokeWidth="2.4" strokeLinecap="round" fill="none">
+            <path className="smoke-puff" d="M96 40 q-6 -5 0 -10 q6 -5 0 -10" />
+            <path className="smoke-puff smoke-puff-2" d="M99 42 q-6 -5 0 -10 q6 -5 0 -10" />
+            <path className="smoke-puff smoke-puff-3" d="M93 44 q-6 -5 0 -10 q6 -5 0 -10" />
+          </g>
+          {/* Chimney */}
+          <rect x="90" y="46" width="12" height="20" rx="1.5" fill="#c98a5e" />
+          {/* Roof */}
+          <path d="M75 40 L118 80 L32 80 Z" fill="#7d8a6a" />
+          <path d="M75 40 L118 80 L32 80 Z" fill="url(#roofShade)" fillOpacity="0.25" />
+          {/* House body */}
+          <rect x="42" y="78" width="66" height="42" rx="2" fill="#e8c9a5" />
+          {/* Door */}
+          <rect x="88" y="92" width="14" height="28" rx="7" fill="#c98a5e" />
+          <circle cx="91" cy="106" r="1.4" fill="#7a5638" />
+          {/* Windows */}
+          <g fill="#f7ede0" stroke="#c98a5e" strokeWidth="1.6">
+            <rect x="50" y="90" width="16" height="16" rx="1.5" />
+            <rect x="68" y="90" width="14" height="14" rx="1.5" />
+          </g>
+          <g stroke="#c98a5e" strokeWidth="1.4">
+            <line x1="58" y1="90" x2="58" y2="106" /><line x1="50" y1="98" x2="66" y2="98" />
+            <line x1="75" y1="90" x2="75" y2="104" /><line x1="68" y1="97" x2="82" y2="97" />
+          </g>
+          <defs>
+            <linearGradient id="roofShade" x1="75" y1="40" x2="75" y2="80" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#5f6b4d" /><stop offset="1" stopColor="#7d8a6a" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        <h2 className="mt-6 font-display text-3xl italic text-ink sm:text-4xl">Hello, welcome home! :)</h2>
+        <p className="mt-5 text-lg font-medium text-ink sm:text-xl">Got a design in mind? We&apos;ll bring it to life.</p>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink/70">
+          Customize your favourite T-shirts, hoodies, mugs, bottles, bags, posters, pet wear, stationery and more.
+        </p>
+        <p className="mt-4 font-display text-xl italic text-terracotta">Your idea. Your style. Your product.</p>
+        <p className="mt-3 max-w-2xl text-base leading-relaxed text-ink/70">
+          Share your design or simply tell us what you have in mind, and let&apos;s create something uniquely yours.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+
 function CustomizeSection() {
   const [cprods, setCprods] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -522,6 +576,7 @@ export default function Home() {
   return (
     <>
       <Hero />
+      <WelcomeHome />
       <CustomizeSection />
 
       <FestiveSection />
