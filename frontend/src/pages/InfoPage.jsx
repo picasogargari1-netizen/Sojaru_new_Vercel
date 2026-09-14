@@ -68,13 +68,8 @@ const CONTENT = {
     ),
   },
   privacy: {
-    title: "Privacy Policy", eyebrow: "Your data",
-    render: () => (
-      <div className="max-w-2xl space-y-4 text-muted-foreground">
-        <p>We respect your privacy. Sojaru collects only the information needed to process your orders and improve your experience — your name, contact details, and order history.</p>
-        <p>We never sell your data. Payment information is handled securely by our payment providers and is never stored on our servers. You can request access to or deletion of your data at any time by contacting us.</p>
-      </div>
-    ),
+    title: "Privacy Policy", eyebrow: "Last Updated: 14 September 2026",
+    render: () => <PrivacyContent />,
   },
   terms: {
     title: "Terms & Conditions", eyebrow: "Last Updated: 14 September 2026",
@@ -337,6 +332,178 @@ function List({ items }) {
     <ul className="list-disc space-y-1.5 pl-6 text-sm leading-relaxed sm:text-base">
       {items.map((it, i) => <li key={i}>{it}</li>)}
     </ul>
+  );
+}
+
+function PrivacyContent() {
+  return (
+    <div className="max-w-3xl space-y-8 text-ink/80" data-testid="privacy-content">
+      <P>At Sojaru, we respect your privacy and are committed to protecting the personal information you provide to us.</P>
+      <P>This Privacy Policy explains how Sojaru ("Sojaru", "we", "us", or "our") collects, uses, stores, shares and protects information when you visit or use www.sojaru.co.in ("Website"), place an order, purchase our products, submit a customization request, or otherwise interact with us.</P>
+      <P>By using our Website or providing your information to us, you acknowledge that you have read and understood this Privacy Policy.</P>
+
+      <Section n="1" title="Information We Collect">
+        <P>Depending on how you interact with our Website and services, we may collect the following information.</P>
+        <Sub n="1.1" title="Personal Information">
+          <P>When you create an account, place an order, contact us or otherwise interact with us, we may collect information such as:</P>
+          <List items={[
+            "Full name", "Email address", "Phone number", "Billing address", "Shipping/delivery address", "Order details", "Payment and transaction-related information", "Account login information, where applicable", "Information you provide when contacting customer support",
+          ]} />
+          <P>We collect only information that is reasonably necessary for providing our products and services.</P>
+        </Sub>
+        <Sub n="1.2" title="Customization Information">
+          <P>If you place a customized order, you may provide:</P>
+          <List items={["Images and photographs", "Artwork or designs", "Logos", "Text", "Names", "Other personalization instructions"]} />
+          <P>Such information may be processed and stored as reasonably necessary to create and fulfil your customized order.</P>
+          <P>You are responsible for ensuring that you have the necessary rights and permissions to provide such content to us.</P>
+        </Sub>
+        <Sub n="1.3" title="Technical Information">
+          <P>When you visit our Website, certain technical information may be collected automatically, which may include:</P>
+          <List items={[
+            "IP address", "Browser type", "Device type", "Operating system", "Pages visited", "Date and time of visits", "Referring website or source", "General Website usage information", "Cookies and similar technologies",
+          ]} />
+          <P>This information may be used to maintain, secure and improve the Website and understand how visitors use our services.</P>
+        </Sub>
+      </Section>
+
+      <Section n="2" title="How We Use Your Information">
+        <P>We may use the information we collect to:</P>
+        <List items={[
+          "Process and fulfil orders; Process customized orders; Process payments; Arrange shipping and delivery; Provide customer support; Communicate with you regarding your orders; Send transactional notifications; Respond to enquiries and requests; Manage customer accounts, where applicable; Prevent fraud, abuse and unauthorized activity; Maintain and secure our Website; Improve our products, services and Website; Understand Website usage and performance; Send promotional communications where permitted and where you have provided the necessary consent; and Comply with applicable legal and regulatory requirements.",
+        ]} />
+        <P>We may also use information where reasonably necessary to protect our legal rights, enforce our Terms &amp; Conditions, or investigate suspected misuse of the Website.</P>
+      </Section>
+
+      <Section n="3" title="Payment Information">
+        <P>Payments made through the Website may be processed by third-party payment service providers such as Razorpay or other payment gateways that we may use.</P>
+        <P>When you make a payment, your payment information may be collected and processed directly by the relevant payment provider.</P>
+        <P>Sojaru does not ordinarily store complete debit card, credit card, banking or other sensitive payment credentials on its own servers.</P>
+        <P>Payment providers may process your information in accordance with their own privacy policies and terms.</P>
+      </Section>
+
+      <Section n="4" title="Cookies and Similar Technologies">
+        <P>Our Website may use cookies and similar technologies to improve functionality, security and user experience.</P>
+        <P>Cookies may help us:</P>
+        <List items={[
+          "Keep the Website functioning properly; Remember certain preferences; Maintain shopping or account sessions; Understand how visitors use the Website; Improve Website performance; and Support analytics or other Website functionality.",
+        ]} />
+        <P>You may be able to control or disable cookies through your browser settings. However, disabling certain cookies may affect the functionality of parts of the Website.</P>
+      </Section>
+
+      <Section n="5" title="How We Share Your Information">
+        <P>We do not sell or rent your personal information to third parties.</P>
+        <P>We may share relevant information with trusted third parties where reasonably necessary to operate our business and provide our services. These may include:</P>
+        <Share label="Payment Service Providers">Payment providers may receive information necessary to process and verify your payment.</Share>
+        <Share label="Shipping and Delivery Partners">We may provide your name, phone number, shipping address and order details to courier, logistics and delivery service providers for the purpose of delivering your order.</Share>
+        <Share label="Technology and Hosting Providers">We may use third-party infrastructure and technology providers to host, operate, maintain and secure our Website, databases, files and related systems.</Share>
+        <Share label="Email and Communication Providers">We may use third-party email or communication service providers to send transactional messages, order notifications, customer support communications and, where applicable, promotional communications.</Share>
+        <Share label="Other Service Providers">We may use other trusted service providers where reasonably necessary for Website operation, analytics, security, customer support, order fulfilment or other legitimate business purposes.</Share>
+        <P>These service providers are expected to process information only for the purposes for which it is provided or as otherwise permitted by applicable law.</P>
+      </Section>
+
+      <Section n="6" title="Customized Designs and Customer-Uploaded Content">
+        <P>If you upload an image, photograph, artwork, logo or other content for customization, we will use that content primarily for processing and fulfilling your order.</P>
+        <P>You should not upload content that you do not have the right to use or that contains personal information of another individual without the necessary permission.</P>
+        <P>We may retain customized files and related order information for a reasonable period for purposes such as:</P>
+        <List items={[
+          "Processing your order; Customer support; Handling complaints or damaged-product claims; Resolving disputes; Maintaining transaction records; and Complying with legal obligations.",
+        ]} />
+        <P>We may delete or anonymize such information when it is no longer reasonably required, subject to applicable legal or business requirements.</P>
+      </Section>
+
+      <Section n="7" title="Data Security">
+        <P>We take reasonable technical and organizational measures to protect personal information against unauthorized access, loss, misuse, alteration or disclosure.</P>
+        <P>However, no method of transmission or electronic storage is completely secure. Therefore, while we take reasonable steps to protect your information, we cannot guarantee absolute security.</P>
+        <P>You are also responsible for keeping your account credentials and passwords confidential and should notify us if you believe your account has been accessed without authorization.</P>
+      </Section>
+
+      <Section n="8" title="Data Retention">
+        <P>We retain personal information only for as long as reasonably necessary for the purposes described in this Privacy Policy, including:</P>
+        <List items={[
+          "Processing and fulfilling orders; Maintaining transaction and business records; Providing customer support; Resolving disputes; Preventing fraud or misuse; Complying with legal, tax, accounting or regulatory obligations; and Protecting our legal rights.",
+        ]} />
+        <P>The period for which information is retained may vary depending on the type of information and the reason for which it was collected.</P>
+      </Section>
+
+      <Section n="9" title="Your Rights and Choices">
+        <P>Subject to applicable law, you may have rights relating to your personal information, including the ability to:</P>
+        <List items={[
+          "Request access to certain personal information we hold about you; Request correction of inaccurate or incomplete information; Request deletion of personal information where legally permissible; Withdraw consent where processing is based on consent; Opt out of promotional communications; and Raise a concern or complaint regarding the handling of your personal information.",
+        ]} />
+        <P>To exercise an applicable right or raise a privacy-related concern, you may contact us using the details provided in the Contact Us section below.</P>
+        <P>Certain information may need to be retained where required by law or where there is a legitimate reason for doing so.</P>
+      </Section>
+
+      <Section n="10" title="Promotional Communications">
+        <P>If you have opted in to receive promotional communications, we may contact you by email, SMS, WhatsApp or other communication channels made available by us.</P>
+        <P>You can opt out of promotional communications at any time by:</P>
+        <List items={[
+          "Using the unsubscribe option included in an email, where available; or Contacting us directly.",
+        ]} />
+        <P>Even if you opt out of promotional communications, we may continue to send essential transactional or service-related communications, such as order confirmations, payment updates, delivery notifications or responses to your enquiries.</P>
+      </Section>
+
+      <Section n="11" title="Third-Party Websites and Services">
+        <P>Our Website may contain links to or integrations with third-party websites, applications or services.</P>
+        <P>These third parties may have their own privacy policies and terms. We are not responsible for the privacy practices, security or content of third-party services that we do not control.</P>
+        <P>We encourage you to review the privacy policies of relevant third-party services before providing them with your personal information.</P>
+      </Section>
+
+      <Section n="12" title="Children's Privacy">
+        <P>Our Website is not intentionally designed to collect personal information from children without appropriate parental or guardian involvement.</P>
+        <P>If you are under 18, you should use the Website and place orders with the involvement and consent of a parent or legal guardian.</P>
+        <P>If we become aware that we have inadvertently collected personal information from a child in circumstances where such collection was not appropriate, we will take reasonable steps to address the situation in accordance with applicable law.</P>
+      </Section>
+
+      <Section n="13" title="Fraud Prevention and Security">
+        <P>We may collect and use information reasonably necessary to detect, investigate and prevent:</P>
+        <List items={[
+          "Fraudulent transactions; Unauthorized access; Abuse of promotional offers; Payment fraud; Attempts to compromise the Website; and Other unlawful or unauthorized activities.",
+        ]} />
+        <P>We may share relevant information with payment providers, service providers, law enforcement authorities or other parties where reasonably necessary or legally required.</P>
+      </Section>
+
+      <Section n="14" title="Legal Disclosures">
+        <P>We may disclose personal information where we reasonably believe that disclosure is necessary to:</P>
+        <List items={[
+          "Comply with applicable law, regulation, court order or legal process; Respond to a lawful request from a government or regulatory authority; Protect the rights, property or safety of Sojaru, our customers or others; Investigate suspected fraud or unlawful activity; or Enforce our Terms & Conditions or other applicable policies.",
+        ]} />
+      </Section>
+
+      <Section n="15" title="Business Transfers">
+        <P>If Sojaru's business, assets or operations are reorganized, merged, transferred, acquired or sold, personal information may be transferred as part of that transaction, subject to applicable law.</P>
+        <P>Any such transfer will be handled in accordance with applicable privacy and data protection requirements.</P>
+      </Section>
+
+      <Section n="16" title="Changes to This Privacy Policy">
+        <P>We may update this Privacy Policy from time to time to reflect changes in our services, technology, business practices or applicable laws.</P>
+        <P>When we make changes, we will update the "Last Updated" date at the top of this Privacy Policy.</P>
+        <P>We encourage you to review this page periodically to stay informed about how we handle personal information.</P>
+      </Section>
+
+      <Section n="17" title="Governing Law">
+        <P>This Privacy Policy shall be governed by and interpreted in accordance with the laws of India, subject to applicable data protection and privacy laws.</P>
+      </Section>
+
+      <Section n="18" title="Contact Us">
+        <P>If you have any questions, requests or concerns regarding this Privacy Policy or the way we handle your personal information, you may contact us at:</P>
+        <div className="mt-3 rounded-xl bg-oat/60 p-5 text-sm leading-relaxed">
+          <p className="font-semibold text-ink">Sojaru</p>
+          <p>Website: www.sojaru.co.in</p>
+          <p>Email: <a href="mailto:hello@sojaru.co.in" className="text-terracotta hover:underline">hello@sojaru.co.in</a></p>
+          <p>Phone: <a href="tel:+919477909496" className="text-terracotta hover:underline">+91 94779 09496</a></p>
+        </div>
+      </Section>
+    </div>
+  );
+}
+
+function Share({ label, children }) {
+  return (
+    <div className="rounded-xl bg-oat/50 p-4">
+      <p className="text-sm font-semibold text-ink sm:text-base">{label}</p>
+      <p className="mt-1 text-sm leading-relaxed sm:text-base">{children}</p>
+    </div>
   );
 }
 
