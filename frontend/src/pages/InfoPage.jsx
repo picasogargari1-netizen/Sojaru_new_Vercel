@@ -58,15 +58,6 @@ const CONTENT = {
       </Accordion>
     ),
   },
-  "shipping-returns": {
-    title: "Shipping & Returns", eyebrow: "The details",
-    render: () => (
-      <div className="max-w-2xl space-y-6 text-muted-foreground">
-        <div><h3 className="font-display text-xl text-ink">Shipping</h3><p className="mt-2">We offer free standard shipping on all orders over ₹1,499. Orders under ₹1,499 ship at a flat ₹99. Orders are dispatched within 1–2 business days and delivered across India within 3–7 business days. Tracking is emailed as soon as your parcel is on its way.</p></div>
-        <div><h3 className="font-display text-xl text-ink">Returns</h3><p className="mt-2">If something isn't quite right, return unworn items in their original condition within 30 days for a full refund. Engraved pet tags are made to order and can only be returned if faulty. Start a return by contacting us with your order number.</p></div>
-      </div>
-    ),
-  },
   privacy: {
     title: "Privacy Policy", eyebrow: "Last Updated: 14 September 2026",
     render: () => <PrivacyContent />,

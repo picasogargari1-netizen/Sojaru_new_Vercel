@@ -54,7 +54,6 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/contact" element={<InfoPage page="contact" />} />
                 <Route path="/faq" element={<InfoPage page="faq" />} />
-                <Route path="/shipping-returns" element={<InfoPage page="shipping-returns" />} />
                 <Route path="/privacy" element={<InfoPage page="privacy" />} />
                 <Route path="/terms" element={<InfoPage page="terms" />} />
                 <Route path="*" element={<NotFound />} />

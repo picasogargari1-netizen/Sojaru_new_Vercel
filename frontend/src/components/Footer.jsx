@@ -83,7 +83,6 @@ export function Footer() {
             <FooterCol title="For Your Pet" links={forPetSubs.map((c) => ({ to: `/category/${c.slug}`, label: c.name }))} />
             <FooterCol title="Information" links={[
               { to: "/contact", label: "Contact" },
-              { to: "/shipping-returns", label: "Shipping & Returns" },
               { to: "/privacy", label: "Privacy Policy" },
               { to: "/terms", label: "Terms & Conditions" },
             ]} />
