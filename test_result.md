@@ -396,7 +396,7 @@ agent_communication:
     -message: |
       ✅ ADMIN PASSWORD CHANGE + TABS OVERLAP FIX - BOTH VERIFIED WORKING (2026-09-12)
       
-      Comprehensive testing completed at https://9e7830e0-3db6-471a-81cf-aedb62c02766.preview.emergentagent.com
+      Comprehensive testing completed at https://commerce-hub-840.preview.emergentagent.com
       
       FIX 1 - ADMIN PASSWORD CHANGE: ✅ WORKING (after backend restart)
       - NEW password (hello@sojaru.co.in / Tintuprapti@123): ✅ Login successful, redirects to /admin
@@ -523,7 +523,7 @@ agent_communication:
     -message: |
       ✅ CUSTOMIZATION FEATURE BACKEND TESTING COMPLETE - ALL 20 TESTS PASSED (100% SUCCESS RATE)
       
-      Tested all 4 new Node.js backend endpoints for the customization feature at https://store-preview-81.preview.emergentagent.com/api
+      Tested all 4 new Node.js backend endpoints for the customization feature at https://commerce-hub-840.preview.emergentagent.com/api
       
       ENDPOINT 1 - GET /api/customizable-products (PUBLIC): ✅ WORKING (4/4 tests passed)
       - Returns HTTP 200 with JSON array
@@ -564,7 +564,7 @@ agent_communication:
     -message: |
       ✅ HOMEPAGE CUSTOMIZATION FORM & ADMIN ORDERS TESTING COMPLETE - ALL 12 TESTS PASSED (100% SUCCESS RATE)
       
-      Tested the new homepage customization section and admin Customized Orders flow end-to-end at https://store-preview-81.preview.emergentagent.com
+      Tested the new homepage customization section and admin Customized Orders flow end-to-end at https://commerce-hub-840.preview.emergentagent.com
       
       PART A - HOMEPAGE CUSTOMIZATION SECTION (7/7 passed):
       1. ✅ Customize section visibility: Fullscreen video section (data-testid="customize-section") scrolls into view correctly below hero and product rows.
@@ -847,7 +847,7 @@ agent_communication:
     status_history:
         - working: false
           agent: "user"
-          comment: "User reported that banner (hero) images and WooCommerce products were not showing on the homepage at https://store-preview-81.preview.emergentagent.com/"
+          comment: "User reported that banner (hero) images and WooCommerce products were not showing on the homepage at https://commerce-hub-840.preview.emergentagent.com/"
         - working: true
           agent: "main"
           comment: "Fixed backend env config. The issue was likely due to missing or incorrect environment variables in backend/.env that prevented proper data loading from MongoDB (hero images) and WooCommerce (products)."
