@@ -6,7 +6,7 @@ import { useStore } from "@/context/StoreContext";
 import { useProducts } from "@/hooks/useProducts";
 import { ProductRow } from "@/components/ProductRow";
 import { catImage } from "@/lib/assets";
-import { mediaUrl, store, orders, apiErr } from "@/lib/api";
+import { mediaUrl, cloudinaryOptimize, store, orders, apiErr } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
@@ -36,8 +36,11 @@ function Hero() {
           heroImages.map((img, i) => (
             <img
               key={i}
-              src={mediaUrl(img.url)}
+              src={cloudinaryOptimize(img.url)}
               alt={img.alt}
+              fetchpriority={i === 0 ? "high" : "low"}
+              loading={i === 0 ? "eager" : "lazy"}
+              decoding={i === 0 ? "sync" : "async"}
               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ${
                 i === idx ? "opacity-100" : "opacity-0"
               }`}

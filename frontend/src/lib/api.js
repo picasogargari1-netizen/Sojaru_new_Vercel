@@ -8,6 +8,12 @@ export const mediaUrl = (url) => {
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
   return `${BACKEND_URL}${url}`;
 };
+// Injects Cloudinary auto-format/quality + width transform for faster hero/banner loads
+export const cloudinaryOptimize = (url, width = 1920) => {
+  const u = mediaUrl(url);
+  if (!u || !u.includes("res.cloudinary.com") || !u.includes("/upload/")) return u;
+  return u.replace("/upload/", `/upload/f_auto,q_auto,w_${width}/`);
+};
 
 const client = axios.create({ baseURL: API });
 

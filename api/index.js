@@ -778,7 +778,14 @@ app.get("/api/account/orders", wrap(async (req, res) => {
 app.get("/api/settings", wrap(async (req, res) => {
   const doc = await getSettings();
   const data = publicSettings(doc);
-  try { const r = await wc("GET", "products/categories", { slug: FESTIVE_SLUG }); if (r.data.length) data.festive.category_id = r.data[0].id; } catch {}
+  const cachedFestiveId = cacheGet("festive_cat_id");
+  if (cachedFestiveId) { data.festive.category_id = cachedFestiveId; }
+  else {
+    try {
+      const r = await wc("GET", "products/categories", { slug: FESTIVE_SLUG });
+      if (r.data.length) { data.festive.category_id = r.data[0].id; cacheSet("festive_cat_id", r.data[0].id, 300); }
+    } catch {}
+  }
   res.json(data);
 }));
 
@@ -791,7 +798,7 @@ app.put("/api/admin/settings", wrap(async (req, res) => {
   if (hero) { const pick = (k, fb) => typeof hero[k] === "string" && hero[k].trim() ? hero[k].trim() : fb; upd.hero = { subtitle: pick("subtitle", DEFAULT_HERO.subtitle), primary_label: pick("primary_label", DEFAULT_HERO.primary_label), primary_link: pick("primary_link", DEFAULT_HERO.primary_link), secondary_label: pick("secondary_label", DEFAULT_HERO.secondary_label), secondary_link: pick("secondary_link", DEFAULT_HERO.secondary_link) }; }
   if (festive) {
     let catId = FESTIVE_FALLBACK_ID;
-    try { const r = await wc("GET", "products/categories", { slug: FESTIVE_SLUG }); if (r.data.length) catId = r.data[0].id; } catch {}
+    try { const r = await wc("GET", "products/categories", { slug: FESTIVE_SLUG }); if (r.data.length) { catId = r.data[0].id; cacheSet("festive_cat_id", catId, 300); } } catch {}
     upd.festive = { title: (festive.title || "Festive Collection").trim(), category_id: catId, enabled: !!festive.enabled };
   }
   if (delivery) {
