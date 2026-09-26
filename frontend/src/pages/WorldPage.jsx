@@ -5,11 +5,13 @@ import { useProducts } from "@/hooks/useProducts";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductGridSkeleton, SectionHeader, ErrorState, EmptyState } from "@/components/States";
 import { IMAGES, catImage } from "@/lib/assets";
+import { mediaUrl } from "@/lib/api";
 import { usePageMeta } from "@/hooks/usePageMeta";
 
 export default function WorldPage() {
   const { slug } = useParams();
-  const { categories, loaded, childrenOf } = useStore();
+  const { categories, loaded, childrenOf, settings } = useStore();
+  const adminCatImages = settings?.category_images || {};
   const world = categories.find((c) => c.slug === slug && c.parent === 0);
   const subs = world ? childrenOf(world.id) : [];
   const childIds = subs.map((c) => c.id).join(",");
@@ -53,16 +55,19 @@ export default function WorldPage() {
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <SectionHeader eyebrow="Categories" title="Browse the collection" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-          {subs.map((c, i) => (
-            <Link key={c.id} to={`/category/${c.slug}`} data-testid={`world-cat-${c.slug}`} className="group relative animate-fade-up overflow-hidden bg-oat" style={{ animationDelay: `${i * 50}ms` }}>
-              <img src={c.image || catImage(c.slug)} alt={c.name} className="aspect-[4/3] w-full object-cover transition-transform duration-700 group-hover:scale-105" />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
-              <div className="absolute bottom-0 flex w-full items-center justify-between p-4">
-                <span className="font-display text-lg text-cream">{c.name}</span>
-                <ArrowRight className="h-4 w-4 text-cream transition-transform group-hover:translate-x-1" />
-              </div>
-            </Link>
-          ))}
+          {subs.map((c, i) => {
+            const imgSrc = adminCatImages[c.slug] ? mediaUrl(adminCatImages[c.slug]) : c.image || catImage(c.slug);
+            return (
+              <Link key={c.id} to={`/category/${c.slug}`} data-testid={`world-cat-${c.slug}`} className="group relative animate-fade-up overflow-hidden bg-oat" style={{ animationDelay: `${i * 50}ms` }}>
+                <img src={imgSrc} alt={c.name} className="aspect-[4/3] w-full object-cover transition-transform duration-700 group-hover:scale-105" onError={(e) => { e.target.src = catImage(c.slug); }} />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/60 to-transparent" />
+                <div className="absolute bottom-0 flex w-full items-center justify-between p-4">
+                  <span className="font-display text-lg text-cream">{c.name}</span>
+                  <ArrowRight className="h-4 w-4 text-cream transition-transform group-hover:translate-x-1" />
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

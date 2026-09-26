@@ -490,16 +490,16 @@ app.get("/api/products/:id/variations", wrap(async (req, res) => {
   cacheSet(ck, data, 90); res.json(data);
 }));
 
-// Related products
+// Related products — same category/sub-category only
 app.get("/api/related/:id", wrap(async (req, res) => {
   const r = await wc("GET", `products/${req.params.id}`);
-  const ids = (r.data.related_ids || []).slice(0, 8);
-  if (!ids.length) {
-    const cats = (r.data.categories || []).map((c) => c.id);
-    if (cats.length) { const rr = await wc("GET", "products", { category: cats[0], per_page: 8, exclude: req.params.id }); return res.json(rr.data.map(serializeProduct)); }
-    return res.json([]);
-  }
-  const rr = await wc("GET", "products", { include: ids.join(","), per_page: 8 }); res.json(rr.data.map(serializeProduct));
+  const prodCatIds = (r.data.categories || []).map((c) => c.id);
+  if (!prodCatIds.length) return res.json([]);
+  const catsRes = await wc("GET", "products/categories", { per_page: 100, include: prodCatIds.join(",") });
+  const subCat = catsRes.data.find((c) => c.parent && c.parent !== 0);
+  const targetCat = subCat ? subCat.id : prodCatIds[0];
+  const rr = await wc("GET", "products", { category: targetCat, per_page: 8, exclude: req.params.id, status: "publish" });
+  res.json(rr.data.map(serializeProduct));
 }));
 
 // Coupon validate

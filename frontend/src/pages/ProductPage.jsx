@@ -29,7 +29,7 @@ function Loading() {
 export default function ProductPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const { money } = useStore();
+  const { money, delivery } = useStore();
   const { addItem, setOpen } = useCart();
 
   const [product, setProduct] = useState(null);
@@ -242,8 +242,8 @@ export default function ProductPage() {
 
           {/* Trust icons */}
           <div className="mt-6 grid grid-cols-3 gap-3 bg-oat/60 p-4 text-center text-xs text-ink/70">
-            <div className="flex flex-col items-center gap-1"><Truck className="h-5 w-5 text-matcha" /> Free ship ₹1,499+</div>
-            <div className="flex flex-col items-center gap-1"><RefreshCw className="h-5 w-5 text-matcha" /> 30-day returns</div>
+            <div className="flex flex-col items-center gap-1"><Truck className="h-5 w-5 text-matcha" /> Free ship {money(delivery.free_above)}+</div>
+            <div className="flex flex-col items-center gap-1"><RefreshCw className="h-5 w-5 text-matcha" /> 7-14 days delivery</div>
             <div className="flex flex-col items-center gap-1"><Shield className="h-5 w-5 text-matcha" /> Secure checkout</div>
           </div>
 
@@ -254,18 +254,6 @@ export default function ProductPage() {
               <AccordionContent>
                 <div className="prose-sm text-sm leading-relaxed text-muted-foreground" dangerouslySetInnerHTML={{ __html: product.description || product.short_description || "Thoughtfully made by Sojaru." }} />
                 {product.sku && <p className="mt-3 font-mono text-xs text-muted-foreground">SKU: {product.sku}</p>}
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="shipping">
-              <AccordionTrigger data-testid="pdp-accordion-shipping" className="text-sm font-bold">Shipping</AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground">
-                Free standard shipping on orders over ₹1,499. Orders ship within 1–2 business days and arrive across India in 3–7 business days. You'll get tracking as soon as it's on the way.
-              </AccordionContent>
-            </AccordionItem>
-            <AccordionItem value="returns">
-              <AccordionTrigger data-testid="pdp-accordion-returns" className="text-sm font-bold">Returns</AccordionTrigger>
-              <AccordionContent className="text-sm text-muted-foreground">
-                Not quite right? Return unworn items within 30 days for a full refund. Engraved pet tags are made to order and non-returnable unless faulty.
               </AccordionContent>
             </AccordionItem>
           </Accordion>

@@ -98,6 +98,11 @@ Checkout creates a pending WooCommerce order via REST, then hands off to the sto
 - Shop-again button links to SITE_URL env var (falls back to WC_STORE_URL). Set SITE_URL to the storefront domain on Vercel for the button to point to the live shop.
 - Verified by sending real branded order + customization emails to hello@sojaru.co.in.
 
+## PDP + World Page Fixes (2026-08)
+- WorldPage ("browse the collection" under For You/For Your Pet) now uses the same admin-uploaded category image priority as the homepage bento grid (settings.category_images[slug] > WooCommerce category.image > hardcoded fallback), with onError fallback.
+- ProductPage trust icons: "Free ship ₹X+" now reads dynamically from admin's Delivery Fee setting (useStore().delivery.free_above) instead of hardcoded ₹1,499. Replaced "30-day returns" with "7-14 days delivery". Removed the Shipping and Returns accordions — only "Product details" remains.
+- Backend `/api/related/:id` rewritten to always source from the product's own category/sub-category (prefers a sub-category with parent!=0 over the parent) instead of WooCommerce related_ids; returns empty array if that category has no other products (frontend already hides the "You may also love" section when empty).
+
 ## Worlds Section — For You / For Your Pet (2026-07)
 - Added a 2-part "Worlds" section on the homepage below the "Durga Pujor Collections" (Festive) card.
 - Two cards: "For You" (routes to /shop/for-you) and "For Your Pet" (routes to /shop/for-your-pet), each with distinct imagery and a "Shop Now" button.
